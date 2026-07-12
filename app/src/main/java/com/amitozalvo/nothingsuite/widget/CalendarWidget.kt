@@ -132,6 +132,15 @@ private fun EventList(events: List<CalendarEvent>) {
                 is WidgetRow.Event -> EventRow(row.event, zone)
             }
         }
+        // Trailing filler so taps below the last event open the calendar
+        item {
+            Box(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+                    .clickable(actionStartActivity(openCalendarAppIntent())),
+            ) {}
+        }
     }
 }
 
@@ -170,7 +179,11 @@ private fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
 
 @Composable
 private fun DaySeparator(label: String) {
-    Column(modifier = GlanceModifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp)) {
+    Column(
+        modifier = GlanceModifier.fillMaxWidth()
+            .padding(top = 8.dp, bottom = 2.dp)
+            .clickable(actionStartActivity(openCalendarAppIntent())),
+    ) {
         Text(
             text = label,
             style = TextStyle(color = ColorProvider(GREY), fontSize = 11.sp, fontWeight = FontWeight.Medium),
@@ -219,7 +232,11 @@ private fun EventRow(event: CalendarEvent, zone: ZoneId) {
 
 @Composable
 private fun EmptyState() {
-    Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = GlanceModifier.fillMaxSize()
+            .clickable(actionStartActivity(openCalendarAppIntent())),
+        contentAlignment = Alignment.Center,
+    ) {
         Text(
             text = "No upcoming events",
             style = TextStyle(color = ColorProvider(GREY), fontSize = 12.sp),
@@ -242,8 +259,13 @@ private fun PermissionHint() {
 }
 
 private fun openCalendarAppIntent(): Intent =
-    Intent(Intent.ACTION_MAIN).apply {
-        addCategory(Intent.CATEGORY_APP_CALENDAR)
+    Intent(Intent.ACTION_VIEW).apply {
+        // Canonical "open calendar app at now" URI; ACTION_MAIN with
+        // CATEGORY_APP_CALENDAR does not resolve on real devices
+        data = CalendarContract.CONTENT_URI.buildUpon()
+            .appendPath("time")
+            .appendPath(System.currentTimeMillis().toString())
+            .build()
         flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
 
