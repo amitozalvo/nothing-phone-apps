@@ -16,9 +16,33 @@ android {
         versionName = "0.1.0"
     }
 
+    // Sideload signing: create signing/release.keystore (gitignored) with
+    //   keytool -genkeypair -keystore signing/release.keystore \
+    //     -alias nothingsuite -keyalg RSA -keysize 2048 -validity 10000
+    // and put the passwords in env vars NOTHINGSUITE_STORE_PASSWORD /
+    // NOTHINGSUITE_KEY_PASSWORD. Without a keystore, release falls back to
+    // the debug key so assembleRelease still produces an installable APK.
+    val sideloadKeystore = rootProject.file("signing/release.keystore")
+    if (sideloadKeystore.exists()) {
+        signingConfigs {
+            create("release") {
+                storeFile = sideloadKeystore
+                storePassword = System.getenv("NOTHINGSUITE_STORE_PASSWORD")
+                keyAlias = System.getenv("NOTHINGSUITE_KEY_ALIAS") ?: "nothingsuite"
+                keyPassword = System.getenv("NOTHINGSUITE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = if (sideloadKeystore.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

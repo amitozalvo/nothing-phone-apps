@@ -9,4 +9,5 @@ captures/
 .cxx/
 *.apk
 *.aab
+signing/
 output-metadata.json
