@@ -300,27 +300,27 @@ class ContextAodToyService : Service() {
                 TitledItem(
                     title = event.title,
                     subtitle = timeFormat.format(event.begin.atZone(zone)),
-                    titleRaster = TextRaster.rasterize(event.title),
+                    titleRaster = TitleRaster.of(event.title),
                 )
             }
         val notifications = StateStore.notificationTitles.value
             .filter { (pkg, _) -> pkg in settings.monitoredApps }
             .take(MAX_DETAIL_ITEMS)
             .map { (_, title) ->
-                TitledItem(title = title, subtitle = null, titleRaster = TextRaster.rasterize(title))
+                TitledItem(title = title, subtitle = null, titleRaster = TitleRaster.of(title))
             }
 
         return ContextSnapshot(
             now = now,
             nextEvent = nextEvent,
-            nextEventTitleRaster = nextEvent?.let { TextRaster.rasterize(it.title) },
+            nextEventTitleRaster = nextEvent?.let { TitleRaster.of(it.title) },
             remainingEventsToday = CalendarRepository.remainingEventsToday(this, now),
             nextAlarm = alarmManager?.nextAlarmClock?.let {
                 Instant.ofEpochMilli(it.triggerTime)
             },
             media = media,
             mediaTitleRaster = media?.let {
-                TextRaster.rasterize(listOfNotNull(it.title, it.artist).joinToString(" - "))
+                TitleRaster.of(listOfNotNull(it.title, it.artist).joinToString(" - "))
             },
             battery = BatteryInfo(batteryPercent(), isCharging()),
             monitoredNotificationCount = settings.monitoredApps.sumOf { counts[it] ?: 0 },

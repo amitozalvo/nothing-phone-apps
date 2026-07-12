@@ -7,47 +7,44 @@ import android.graphics.Paint
 import android.graphics.Typeface
 
 /**
- * Rasterizes arbitrary unicode text (event/track titles in any script) into
- * a boolean pixel grid for marquee display on the matrix. The tiny DotFont
- * only covers A–Z/0–9; this handles everything else via the system font.
+ * Fallback rasterizer for text the 5×7 PixelFont can't cover (Hebrew and
+ * other scripts). Renders the system font with anti-aliasing OFF at a
+ * small size — hard 1-bit edges survive on LEDs where thresholded
+ * anti-aliased strokes break up.
  */
 object TextRaster {
 
     fun rasterize(text: String, height: Int = 9): Array<BooleanArray> {
         if (text.isBlank()) return emptyArray()
 
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val paint = Paint().apply {
+            isAntiAlias = false
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textSize = height * 1.4f
+            textSize = height * 1.2f
             color = Color.WHITE
         }
         val metrics = paint.fontMetrics
-        val textHeight = metrics.descent - metrics.ascent
+        val bmpHeight = (metrics.descent - metrics.ascent).toInt().coerceAtLeast(1)
         val width = paint.measureText(text).toInt().coerceAtLeast(1)
 
-        val bitmap = Bitmap.createBitmap(width, textHeight.toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        val bitmap = Bitmap.createBitmap(width, bmpHeight, Bitmap.Config.ARGB_8888)
         Canvas(bitmap).drawText(text, 0f, -metrics.ascent, paint)
 
-        val scaled = Bitmap.createScaledBitmap(
-            bitmap,
-            (width * height / textHeight).toInt().coerceAtLeast(1),
-            height,
-            true,
-        )
+        val grid = Array(bmpHeight) { y ->
+            BooleanArray(width) { x -> Color.alpha(bitmap.getPixel(x, y)) > 0 }
+        }
         bitmap.recycle()
 
-        // Low threshold keeps strokes solid after downscaling — thin/broken
-        // glyphs are unreadable on LEDs
-        val result = Array(height) { y ->
-            BooleanArray(scaled.width) { x ->
-                val pixel = scaled.getPixel(x, y)
-                Color.alpha(pixel) > 60 && luminance(pixel) > 60
-            }
-        }
-        scaled.recycle()
-        return result
-    }
+        // Trim empty rows so the visible glyphs use the full budget
+        val content = grid.dropWhile { row -> row.none { it } }
+            .dropLastWhile { row -> row.none { it } }
+            .ifEmpty { return emptyArray() }
 
-    private fun luminance(pixel: Int): Int =
-        (Color.red(pixel) * 3 + Color.green(pixel) * 6 + Color.blue(pixel)) / 10
+        if (content.size <= height + 1) return content.toTypedArray()
+
+        // Nearest-neighbour vertical squeeze as a last resort
+        return Array(height) { y ->
+            content[y * content.size / height]
+        }
+    }
 }

@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.sp
 import com.amitozalvo.nothingsuite.calendar.CalendarEvent
 import com.amitozalvo.nothingsuite.config.GlyphSettings
 import com.amitozalvo.nothingsuite.glyph.MatrixBuffer
-import com.amitozalvo.nothingsuite.glyph.TextRaster
+import com.amitozalvo.nothingsuite.glyph.TitleRaster
 import com.amitozalvo.nothingsuite.glyph.scenes.AlarmRingingToast
 import com.amitozalvo.nothingsuite.glyph.scenes.AlarmScene
 import com.amitozalvo.nothingsuite.glyph.scenes.AmbientScene
@@ -64,11 +64,11 @@ private fun buildPreviews(settings: GlyphSettings): List<Pair<String, IntArray>>
     val snapshot = ContextSnapshot(
         now = now,
         nextEvent = sampleEvent,
-        nextEventTitleRaster = TextRaster.rasterize(sampleEvent.title),
+        nextEventTitleRaster = TitleRaster.of(sampleEvent.title),
         remainingEventsToday = 3,
         nextAlarm = now.plusSeconds(20 * 60),
         media = MediaInfo(title = "Song title", artist = "Artist", playing = true),
-        mediaTitleRaster = TextRaster.rasterize("Song title - Artist"),
+        mediaTitleRaster = TitleRaster.of("Song title - Artist"),
         battery = BatteryInfo(64, false),
         monitoredNotificationCount = 2,
     )

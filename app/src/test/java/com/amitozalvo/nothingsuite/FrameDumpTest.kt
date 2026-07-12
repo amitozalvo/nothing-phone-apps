@@ -3,6 +3,7 @@ package com.amitozalvo.nothingsuite
 import com.amitozalvo.nothingsuite.calendar.CalendarEvent
 import com.amitozalvo.nothingsuite.config.GlyphSettings
 import com.amitozalvo.nothingsuite.glyph.MatrixBuffer
+import com.amitozalvo.nothingsuite.glyph.PixelFont
 import com.amitozalvo.nothingsuite.glyph.scenes.AlarmRingingToast
 import com.amitozalvo.nothingsuite.glyph.scenes.AlarmScene
 import com.amitozalvo.nothingsuite.glyph.scenes.AmbientScene
@@ -39,8 +40,12 @@ class FrameDumpTest {
         )
         val cfg = GlyphSettings(monitoredApps = setOf("x"), showOngoingEvent = true)
         val snapshotWithItems = snapshot.copy(
-            todayEventItems = listOf(TitledItem("Design sync", "12:12", null)),
-            notificationItems = listOf(TitledItem("Message", null, null)),
+            todayEventItems = listOf(
+                TitledItem("Design sync", "12:12", PixelFont.rasterizeOrNull("Design sync")),
+            ),
+            notificationItems = listOf(
+                TitledItem("Message", null, PixelFont.rasterizeOrNull("Message")),
+            ),
         )
 
         fun dump(name: String, block: (MatrixBuffer) -> Unit) {
