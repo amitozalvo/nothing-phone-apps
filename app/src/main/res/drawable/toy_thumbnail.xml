@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- dot-matrix "clock face" thumbnail -->
+    <path android:fillColor="#FF000000" android:pathData="M0,0h48v48h-48z" />
+    <path android:fillColor="#FFF2F2F2"
+        android:pathData="M10,10m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M17,10m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M24,10m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M31,10m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M38,10m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M10,17m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M38,17m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M10,24m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M24,24m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M38,24m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M10,31m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M38,31m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M10,38m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M17,38m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M24,38m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M31,38m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M38,38m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0" />
+    <path android:fillColor="#FFD71921"
+        android:pathData="M24,17m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0 M31,24m-2,0a2,2 0 1,1 4,0a2,2 0 1,1 -4,0" />
+</vector>

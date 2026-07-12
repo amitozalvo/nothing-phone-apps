@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Nothing Suite</string>
+    <string name="widget_label">Calendar</string>
+    <string name="widget_description">Current date and upcoming events in Nothing style</string>
+    <string name="toy_name">Context AOD</string>
+    <string name="toy_summary">Context-aware always-on display: next event, OTP codes, alarms, media and daily status</string>
+    <string name="notification_listener_label">Nothing Suite context access</string>
+</resources>

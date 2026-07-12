@@ -1,0 +1,294 @@
+package com.amitozalvo.nothingsuite.glyph
+
+import android.app.AlarmManager
+import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.database.ContentObserver
+import android.os.BatteryManager
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.os.Message
+import android.os.Messenger
+import android.provider.CalendarContract
+import android.util.Log
+import com.amitozalvo.nothingsuite.calendar.CalendarRepository
+import com.amitozalvo.nothingsuite.config.GlyphSettings
+import com.amitozalvo.nothingsuite.config.SettingsRepository
+import com.amitozalvo.nothingsuite.glyph.scenes.ChargingToast
+import com.amitozalvo.nothingsuite.glyph.scenes.LowBatteryToast
+import com.amitozalvo.nothingsuite.glyph.scenes.OtpToast
+import com.amitozalvo.nothingsuite.glyph.scenes.SceneEngine
+import com.amitozalvo.nothingsuite.state.BatteryInfo
+import com.amitozalvo.nothingsuite.state.ContextSnapshot
+import com.amitozalvo.nothingsuite.state.StateStore
+import com.nothing.ketchum.Glyph
+import com.nothing.ketchum.GlyphMatrixManager
+import com.nothing.ketchum.GlyphToy
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import java.time.Duration
+import java.time.Instant
+
+/**
+ * The "Context AOD" Glyph Toy. While bound by NothingOS it renders the
+ * scene engine's output on the 25×25 matrix, reacting to AOD ticks, Glyph
+ * Button events, notification/OTP state, battery and calendar changes.
+ */
+class ContextAodToyService : Service() {
+
+    private val engine = SceneEngine.createDefault()
+    private var manager: GlyphMatrixManager? = null
+    private var scope: CoroutineScope? = null
+
+    private var settings = GlyphSettings()
+    private var snapshot = ContextSnapshot(now = Instant.now())
+    private var tick = 0L
+    private var lastFrame: IntArray? = null
+    private var lastBatteryPercent = 100
+    private var peeking = false
+    private var refreshJob: Job? = null
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private val animator = object : Runnable {
+        override fun run() {
+            tick++
+            renderAndPush()
+            mainHandler.postDelayed(this, ANIMATION_INTERVAL_MS)
+        }
+    }
+
+    private val toyEventHandler = object : Handler(Looper.getMainLooper()) {
+        override fun handleMessage(msg: Message) {
+            when (msg.what) {
+                GlyphToy.MSG_GLYPH_TOY -> {
+                    when (msg.data?.getString(GlyphToy.MSG_GLYPH_TOY_DATA)) {
+                        GlyphToy.EVENT_AOD -> refreshSnapshot()
+                        GlyphToy.EVENT_ACTION_DOWN -> onButtonDown()
+                        GlyphToy.EVENT_ACTION_UP -> onButtonUp()
+                        GlyphToy.EVENT_CHANGE -> onLongPress()
+                    }
+                }
+                else -> super.handleMessage(msg)
+            }
+        }
+    }
+
+    private val messenger = Messenger(toyEventHandler)
+
+    private val managerCallback = object : GlyphMatrixManager.Callback {
+        override fun onServiceConnected(name: ComponentName?) {
+            manager?.register(Glyph.DEVICE_23112)
+            refreshSnapshot()
+            mainHandler.post(animator)
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {}
+    }
+
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                Intent.ACTION_POWER_CONNECTED -> {
+                    if (settings.chargingToastEnabled) {
+                        engine.postToast(
+                            ChargingToast(batteryPercent(), toastExpiry())
+                        )
+                    }
+                    refreshSnapshot()
+                }
+                Intent.ACTION_POWER_DISCONNECTED -> refreshSnapshot()
+                Intent.ACTION_BATTERY_CHANGED -> {
+                    val percent = batteryPercent()
+                    val charging = isCharging()
+                    if (settings.lowBatteryToastEnabled && !charging) {
+                        for (threshold in listOf(settings.lowBatteryThreshold, 5)) {
+                            if (percent <= threshold && lastBatteryPercent > threshold) {
+                                engine.postToast(LowBatteryToast(percent, toastExpiry()))
+                            }
+                        }
+                    }
+                    if (percent != lastBatteryPercent) {
+                        lastBatteryPercent = percent
+                        refreshSnapshot()
+                    }
+                }
+            }
+        }
+    }
+
+    private val calendarObserver = object : ContentObserver(mainHandler) {
+        override fun onChange(selfChange: Boolean) = refreshSnapshot()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? {
+        Log.d(TAG, "onBind")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        this.scope = scope
+
+        GlyphMatrixManager.getInstance(applicationContext)?.let {
+            manager = it
+            it.init(managerCallback)
+        }
+
+        lastBatteryPercent = batteryPercent()
+
+        registerReceiver(batteryReceiver, IntentFilter().apply {
+            addAction(Intent.ACTION_POWER_CONNECTED)
+            addAction(Intent.ACTION_POWER_DISCONNECTED)
+            addAction(Intent.ACTION_BATTERY_CHANGED)
+        })
+        if (CalendarRepository.hasPermission(this)) {
+            contentResolver.registerContentObserver(
+                CalendarContract.CONTENT_URI, true, calendarObserver
+            )
+        }
+
+        scope.launch {
+            SettingsRepository.get(applicationContext).settings.collect {
+                settings = it
+                refreshSnapshot()
+            }
+        }
+        scope.launch {
+            StateStore.otp.collect { otp ->
+                if (otp != null && settings.otpEnabled) {
+                    engine.postToast(
+                        OtpToast(
+                            code = otp.code,
+                            expiresAt = otp.postedAt.plusSeconds(
+                                settings.otpTimeoutSeconds.toLong()
+                            ),
+                            notificationKey = otp.notificationKey,
+                        )
+                    )
+                } else if (otp == null) {
+                    engine.clearOtpToast()
+                }
+                renderAndPush(force = true)
+            }
+        }
+        scope.launch {
+            StateStore.media.collect { refreshSnapshot() }
+        }
+        scope.launch {
+            StateStore.notificationCounts.collect { refreshSnapshot() }
+        }
+
+        return messenger.binder
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        Log.d(TAG, "onUnbind")
+        mainHandler.removeCallbacks(animator)
+        runCatching { unregisterReceiver(batteryReceiver) }
+        runCatching { contentResolver.unregisterContentObserver(calendarObserver) }
+        scope?.cancel()
+        scope = null
+        manager?.turnOff()
+        manager?.unInit()
+        manager = null
+        return false
+    }
+
+    private fun onButtonDown() {
+        if (engine.dismissToastByButton()) {
+            StateStore.clearOtp()
+            renderAndPush(force = true)
+            return
+        }
+        peeking = true
+        renderAndPush(force = true)
+    }
+
+    private fun onButtonUp() {
+        if (peeking) {
+            peeking = false
+            renderAndPush(force = true)
+        }
+    }
+
+    private fun onLongPress() {
+        // Long press: force-refresh all context and re-render
+        refreshSnapshot()
+    }
+
+    private fun refreshSnapshot() {
+        refreshJob?.cancel()
+        refreshJob = scope?.launch(Dispatchers.IO) {
+            val newSnapshot = buildSnapshot()
+            mainHandler.post {
+                snapshot = newSnapshot
+                renderAndPush(force = true)
+            }
+        }
+    }
+
+    private fun buildSnapshot(): ContextSnapshot {
+        val now = Instant.now()
+        val nextEvent = CalendarRepository.nextTimedEvent(this, now)
+        val media = StateStore.media.value
+        val counts = StateStore.notificationCounts.value
+        val alarmManager = getSystemService(AlarmManager::class.java)
+
+        return ContextSnapshot(
+            now = now,
+            nextEvent = nextEvent,
+            nextEventTitleRaster = nextEvent?.let { TextRaster.rasterize(it.title) },
+            remainingEventsToday = CalendarRepository.remainingEventsToday(this, now),
+            nextAlarm = alarmManager?.nextAlarmClock?.let {
+                Instant.ofEpochMilli(it.triggerTime)
+            },
+            media = media,
+            mediaTitleRaster = media?.let {
+                TextRaster.rasterize(listOfNotNull(it.title, it.artist).joinToString(" - "))
+            },
+            battery = BatteryInfo(batteryPercent(), isCharging()),
+            monitoredNotificationCount = settings.monitoredApps.sumOf { counts[it] ?: 0 },
+        )
+    }
+
+    private fun renderAndPush(force: Boolean = false) {
+        val gmm = manager ?: return
+        // Keep "now" fresh between snapshot rebuilds so clocks don't lag
+        val current = snapshot.copy(now = Instant.now())
+        val effectiveSettings = if (peeking) peekSettings(current) else settings
+        val frame = engine.renderFrame(current, effectiveSettings, tick)
+        if (!force && lastFrame?.contentEquals(frame) == true) return
+        lastFrame = frame
+        runCatching { gmm.setMatrixFrame(frame) }
+            .onFailure { Log.w(TAG, "setMatrixFrame failed", it) }
+    }
+
+    /** While the button is held, reorder so the next scene previews first. */
+    private fun peekSettings(current: ContextSnapshot): GlyphSettings {
+        val next = engine.peekNextScene(current, settings) ?: return settings
+        return settings.copy(
+            sceneOrder = listOf(next.id) + settings.sceneOrder.filter { it != next.id }
+        )
+    }
+
+    private fun batteryPercent(): Int =
+        getSystemService(BatteryManager::class.java)
+            ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 100
+
+    private fun isCharging(): Boolean =
+        getSystemService(BatteryManager::class.java)?.isCharging ?: false
+
+    private fun toastExpiry(): Instant = Instant.now().plus(TOAST_DURATION)
+
+    private companion object {
+        const val TAG = "ContextAodToy"
+        const val ANIMATION_INTERVAL_MS = 250L
+        val TOAST_DURATION: Duration = Duration.ofSeconds(8)
+    }
+}
