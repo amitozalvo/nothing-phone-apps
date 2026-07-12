@@ -36,14 +36,15 @@ object MatrixIcons {
         "111111110",
     )
 
+    // Clock face with hands at ~3 o'clock
     val ALARM = listOf(
-        "1000001",
         "0011100",
         "0100010",
-        "0101010",
-        "0100110",
+        "1001001",
+        "1001101",
+        "1000001",
+        "0100010",
         "0011100",
-        "0000000",
     )
 
     val NOTE = listOf(

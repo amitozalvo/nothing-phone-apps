@@ -124,31 +124,29 @@ class AmbientScene : Scene {
     ) {
         val zoned = snapshot.now.atZone(ZoneId.systemDefault())
 
-        buffer.bigTextCentered(2, TIME_FORMAT.format(zoned), 255)
-
         val weekday = zoned.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).uppercase()
-        buffer.smallTextCentered(10, "$weekday ${zoned.dayOfMonth}", 140)
+        buffer.smallTextCentered(1, "$weekday ${zoned.dayOfMonth}", 140)
 
-        // Icon row: events remaining today; monitored app notifications
-        var x = 2
+        buffer.bigTextCentered(8, TIME_FORMAT.format(zoned), 255)
+
+        // Status row: events remaining today; monitored app notifications;
+        // battery indicator. Counts capped at one digit so the row fits.
+        var x = 0
         buffer.sprite(x, 18, MatrixIcons.CALENDAR, 180)
         x += 6
-        x += buffer.smallText(x, 18, count(snapshot.remainingEventsToday), 255) + 3
+        x += buffer.smallText(x, 18, count(snapshot.remainingEventsToday), 255) + 2
         if (settings.monitoredApps.isNotEmpty()) {
             buffer.sprite(x, 18, MatrixIcons.BELL, 180)
             x += 6
-            buffer.smallText(x, 18, count(snapshot.monitoredNotificationCount), 255)
+            x += buffer.smallText(x, 18, count(snapshot.monitoredNotificationCount), 255) + 2
         }
-
-        // Corner indicators
         if (snapshot.battery.charging) {
-            buffer.sprite(21, 0, MatrixIcons.LIGHTNING, 200)
+            buffer.sprite(22, 18, MatrixIcons.LIGHTNING, 200)
         } else if (snapshot.battery.percent <= settings.lowBatteryThreshold) {
-            // Dim pulse between AOD ticks is not possible; alternate on tick
-            val brightness = if (tick % 2 == 0L) 90 else 40
-            buffer.sprite(0, 0, MatrixIcons.BATTERY.map { it.substring(0, 6) }, brightness)
+            val brightness = if (tick % 2 == 0L) 200 else 90
+            buffer.smallText(23, 18, "!", brightness)
         }
     }
 
-    private fun count(n: Int): String = if (n > 9) "9+" else n.toString()
+    private fun count(n: Int): String = n.coerceAtMost(9).toString()
 }
