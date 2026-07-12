@@ -13,21 +13,28 @@ class SceneEngine(scenes: List<Scene>) {
 
     private val scenesById = scenes.associateBy { it.id }
 
+    @Suppress("UNCHECKED_CAST")
+    fun <T : Scene> scene(id: String): T = scenesById.getValue(id) as T
+
     var currentToast: MatrixToast? = null
         private set
 
     fun postToast(toast: MatrixToast) {
         val current = currentToast
-        // An OTP toast is only replaced by another OTP toast
-        if (current is OtpToast && toast !is OtpToast) return
+        if (current != null && toast.priority < current.priority) return
         currentToast = toast
     }
 
     /** Returns true if a toast was dismissed by the button press. */
     fun dismissToastByButton(): Boolean {
         val toast = currentToast ?: return false
+        if (!toast.dismissableByButton) return false
         currentToast = null
-        return toast.dismissableByButton
+        return true
+    }
+
+    fun clearRingingAlarmToast() {
+        if (currentToast is AlarmRingingToast) currentToast = null
     }
 
     fun clearOtpToast(notificationKey: String? = null) {
@@ -53,27 +60,18 @@ class SceneEngine(scenes: List<Scene>) {
      */
     fun renderFrame(snapshot: ContextSnapshot, settings: GlyphSettings, tick: Long): IntArray {
         val buffer = MatrixBuffer()
-        currentToast?.let { toast ->
-            if (toast.isExpired(snapshot.now)) {
-                currentToast = null
+        val toast = currentToast
+        if (toast != null && toast.isExpired(snapshot.now)) currentToast = null
+        currentToast.let { active ->
+            if (active != null) {
+                active.render(buffer, tick)
             } else {
-                toast.render(buffer, tick)
-                return buffer.snapshot()
+                selectScene(snapshot, settings).render(buffer, snapshot, settings, tick)
             }
         }
-        selectScene(snapshot, settings).render(buffer, snapshot, settings, tick)
+        // The physical matrix is round — corner cells don't exist
+        buffer.maskCircle()
         return buffer.snapshot()
-    }
-
-    /** The active scene after the currently shown one, for button "peek". */
-    fun peekNextScene(snapshot: ContextSnapshot, settings: GlyphSettings): Scene? {
-        val active = settings.activeSceneOrder()
-            .mapNotNull { scenesById[it] }
-            .filter { it.isActive(snapshot, settings) }
-        if (active.size < 2) return null
-        val current = selectScene(snapshot, settings)
-        val idx = active.indexOfFirst { it.id == current.id }
-        return active[(idx + 1).mod(active.size)]
     }
 
     companion object {

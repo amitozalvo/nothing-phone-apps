@@ -19,10 +19,18 @@ import android.util.Log
 import com.amitozalvo.nothingsuite.calendar.CalendarRepository
 import com.amitozalvo.nothingsuite.config.GlyphSettings
 import com.amitozalvo.nothingsuite.config.SettingsRepository
+import com.amitozalvo.nothingsuite.config.SceneIds
+import com.amitozalvo.nothingsuite.glyph.scenes.AlarmRingingToast
+import com.amitozalvo.nothingsuite.glyph.scenes.AlarmScene
+import com.amitozalvo.nothingsuite.glyph.scenes.AmbientScene
 import com.amitozalvo.nothingsuite.glyph.scenes.ChargingToast
 import com.amitozalvo.nothingsuite.glyph.scenes.LowBatteryToast
+import com.amitozalvo.nothingsuite.glyph.scenes.MediaScene
+import com.amitozalvo.nothingsuite.glyph.scenes.NextEventScene
 import com.amitozalvo.nothingsuite.glyph.scenes.OtpToast
 import com.amitozalvo.nothingsuite.glyph.scenes.SceneEngine
+import com.amitozalvo.nothingsuite.glyph.scenes.TextToast
+import com.amitozalvo.nothingsuite.notifications.GlyphNotificationListener
 import com.amitozalvo.nothingsuite.state.BatteryInfo
 import com.amitozalvo.nothingsuite.state.ContextSnapshot
 import com.amitozalvo.nothingsuite.state.StateStore
@@ -45,7 +53,11 @@ import java.time.Instant
  */
 class ContextAodToyService : Service() {
 
-    private val engine = SceneEngine.createDefault()
+    private val nextEventScene = NextEventScene()
+    private val ambientScene = AmbientScene()
+    private val engine = SceneEngine(
+        listOf(nextEventScene, AlarmScene(), MediaScene(), ambientScene)
+    )
     private var manager: GlyphMatrixManager? = null
     private var scope: CoroutineScope? = null
 
@@ -54,7 +66,6 @@ class ContextAodToyService : Service() {
     private var tick = 0L
     private var lastFrame: IntArray? = null
     private var lastBatteryPercent = 100
-    private var peeking = false
     private var refreshJob: Job? = null
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -183,6 +194,16 @@ class ContextAodToyService : Service() {
         scope.launch {
             StateStore.notificationCounts.collect { refreshSnapshot() }
         }
+        scope.launch {
+            StateStore.ringingAlarm.collect { ringing ->
+                if (ringing != null) {
+                    engine.postToast(AlarmRingingToast(ringing.notificationKey))
+                } else {
+                    engine.clearRingingAlarmToast()
+                }
+                renderAndPush(force = true)
+            }
+        }
 
         return messenger.binder
     }
@@ -201,18 +222,45 @@ class ContextAodToyService : Service() {
     }
 
     private fun onButtonDown() {
-        if (engine.dismissToastByButton()) {
-            StateStore.clearOtp()
+        val toast = engine.currentToast
+
+        // Ringing alarm: the button snoozes
+        if (toast is AlarmRingingToast) {
+            val snoozed = GlyphNotificationListener.instance?.snoozeRingingAlarm() == true
+            if (snoozed) {
+                engine.clearRingingAlarmToast()
+                engine.postToast(TextToast("ZZZ", Instant.now().plusSeconds(2)))
+            }
             renderAndPush(force = true)
             return
         }
-        peeking = true
+
+        // Any other toast: dismiss
+        if (engine.dismissToastByButton()) {
+            if (toast is OtpToast) StateStore.clearOtp()
+            renderAndPush(force = true)
+            return
+        }
+
+        // No toast: the button acts on the current scene
+        when (engine.selectScene(snapshot.copy(now = Instant.now()), settings).id) {
+            SceneIds.MEDIA -> {
+                val playing = GlyphNotificationListener.instance?.toggleMediaPlayback()
+                if (playing != null) {
+                    engine.postToast(
+                        TextToast(if (playing) "PLAY" else "PAUSE", Instant.now().plusSeconds(1))
+                    )
+                }
+            }
+            SceneIds.NEXT_EVENT -> nextEventScene.showTitle = true
+            SceneIds.AMBIENT -> ambientScene.cycle(Instant.now(), settings)
+        }
         renderAndPush(force = true)
     }
 
     private fun onButtonUp() {
-        if (peeking) {
-            peeking = false
+        if (nextEventScene.showTitle) {
+            nextEventScene.showTitle = false
             renderAndPush(force = true)
         }
     }
@@ -254,6 +302,7 @@ class ContextAodToyService : Service() {
             },
             battery = BatteryInfo(batteryPercent(), isCharging()),
             monitoredNotificationCount = settings.monitoredApps.sumOf { counts[it] ?: 0 },
+            ringingAlarm = StateStore.ringingAlarm.value,
         )
     }
 
@@ -261,20 +310,11 @@ class ContextAodToyService : Service() {
         val gmm = manager ?: return
         // Keep "now" fresh between snapshot rebuilds so clocks don't lag
         val current = snapshot.copy(now = Instant.now())
-        val effectiveSettings = if (peeking) peekSettings(current) else settings
-        val frame = engine.renderFrame(current, effectiveSettings, tick)
+        val frame = engine.renderFrame(current, settings, tick)
         if (!force && lastFrame?.contentEquals(frame) == true) return
         lastFrame = frame
         runCatching { gmm.setMatrixFrame(frame) }
             .onFailure { Log.w(TAG, "setMatrixFrame failed", it) }
-    }
-
-    /** While the button is held, reorder so the next scene previews first. */
-    private fun peekSettings(current: ContextSnapshot): GlyphSettings {
-        val next = engine.peekNextScene(current, settings) ?: return settings
-        return settings.copy(
-            sceneOrder = listOf(next.id) + settings.sceneOrder.filter { it != next.id }
-        )
     }
 
     private fun batteryPercent(): Int =

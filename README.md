@@ -56,8 +56,11 @@ connected.
 
 ## Glyph Button
 
-- **Short press while an alert shows** — dismiss it (OTP, battery).
-- **Short press otherwise** — peek at the next active scene.
+- **Alarm ringing** — press to snooze (fires the alarm notification's snooze action).
+- **Alert showing (OTP, battery)** — press to dismiss.
+- **On the ambient board** — press cycles detail views: events today → monitored notifications → back.
+- **On the next-event ring** — hold to see the event title scroll.
+- **On now playing** — press toggles play/pause.
 - **Long press** — force-refresh all context data.
 
 ## Project layout

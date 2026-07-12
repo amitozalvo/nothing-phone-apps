@@ -1,5 +1,10 @@
 package com.amitozalvo.nothingsuite.glyph
 
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.roundToInt
+import kotlin.math.sin
+
 /**
  * A 25×25 brightness buffer for the Glyph Matrix. Values 0–255.
  * Pure Kotlin so scene rendering is unit-testable on the JVM.
@@ -91,6 +96,39 @@ class MatrixBuffer(val size: Int = SIZE) {
     }
 
     /**
+     * Circular progress ring hugging the (physically round) matrix edge,
+     * clockwise from 12 o'clock. [progress] in [0, 1] lights the travelled
+     * arc bright over a dim track.
+     */
+    fun ring(progress: Float, track: Int, fill: Int) {
+        val steps = 96
+        val c = (size - 1) / 2.0
+        val r = c - 0.5
+        fun plot(i: Int, brightness: Int) {
+            val angle = 2.0 * PI * i / steps
+            val x = (c + r * sin(angle)).roundToInt()
+            val y = (c - r * cos(angle)).roundToInt()
+            set(x, y, brightness)
+        }
+        for (i in 0 until steps) plot(i, track)
+        val lit = (steps * progress.coerceIn(0f, 1f)).roundToInt()
+        for (i in 0 until lit) plot(i, fill)
+    }
+
+    /**
+     * Zero out pixels outside the physically round LED area. The Phone (3)
+     * matrix is a circle inscribed in the 25×25 grid — corner cells have
+     * no LEDs. Called by the engine on every finished frame.
+     */
+    fun maskCircle() {
+        for (y in 0 until size) {
+            for (x in 0 until size) {
+                if (!inCircle(x, y, size)) pixels[y * size + x] = 0
+            }
+        }
+    }
+
+    /**
      * Draw a boolean raster (e.g. rasterized unicode text) clipped to the
      * matrix, offset horizontally by [scrollX] for marquee scrolling.
      */
@@ -106,5 +144,13 @@ class MatrixBuffer(val size: Int = SIZE) {
 
     companion object {
         const val SIZE = 25
+
+        /** Whether the grid cell physically exists on the round matrix. */
+        fun inCircle(x: Int, y: Int, size: Int = SIZE): Boolean {
+            val c = (size - 1) / 2.0
+            val dx = x - c
+            val dy = y - c
+            return dx * dx + dy * dy <= c * c + size / 2.0
+        }
     }
 }

@@ -25,8 +25,9 @@ interface Scene {
 /** Shared helpers for marquee text rendering. */
 object Marquee {
     /**
-     * Draw [rasterized] text at row [y]; scrolls when wider than the matrix,
-     * else centers it. Returns true if the text is scrolling (needs animation).
+     * Draw [rasterized] text at row [y]. Scrolls when wider than the matrix
+     * (or always, with [force]); otherwise centers it. Returns true if the
+     * text is scrolling (needs animation).
      */
     fun draw(
         buffer: MatrixBuffer,
@@ -34,10 +35,11 @@ object Marquee {
         rasterized: Array<BooleanArray>?,
         tick: Long,
         brightness: Int = 200,
+        force: Boolean = false,
     ): Boolean {
         if (rasterized == null || rasterized.isEmpty()) return false
         val width = rasterized.maxOf { it.size }
-        return if (width <= buffer.size) {
+        return if (width <= buffer.size && !force) {
             buffer.raster((buffer.size - width) / 2, y, rasterized, 0, brightness)
             false
         } else {

@@ -13,9 +13,17 @@ import java.util.Locale
 
 private val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
 
-/** Countdown + progress toward the next calendar event. */
+/**
+ * Chosen design: circular progress ring hugging the matrix edge that fills
+ * as the event approaches (or elapses, when ongoing), big minutes centered.
+ * While the Glyph Button is held, the countdown swaps for the scrolling
+ * event title.
+ */
 class NextEventScene : Scene {
     override val id = SceneIds.NEXT_EVENT
+
+    /** Set by the toy service while the Glyph Button is held down. */
+    var showTitle = false
 
     override fun isActive(snapshot: ContextSnapshot, settings: GlyphSettings): Boolean {
         val event = snapshot.nextEvent ?: return false
@@ -45,20 +53,31 @@ class NextEventScene : Scene {
             progress = 1f - minutes.toFloat() / lead
         }
 
-        if (minutes < 1 && !ongoing) {
-            buffer.smallTextCentered(2, "NOW", 255)
-        } else {
-            buffer.bigTextCentered(1, minutes.coerceAtMost(99).toString(), 255)
-            buffer.smallTextCentered(8, if (ongoing) "LEFT" else "MIN", 120)
+        buffer.ring(progress, track = 45, fill = 255)
+
+        if (showTitle) {
+            Marquee.draw(buffer, 9, snapshot.nextEventTitleRaster, tick, force = true)
+            return
         }
 
-        Marquee.draw(buffer, 15, snapshot.nextEventTitleRaster, tick)
-
-        buffer.progressBar(1, 22, buffer.size - 2, 3, progress, 255)
+        when {
+            ongoing -> {
+                buffer.bigTextCentered(7, minutes.coerceAtMost(99).toString(), 255)
+                buffer.smallTextCentered(15, "LEFT", 110)
+            }
+            minutes < 1 -> buffer.smallTextCentered(10, "NOW", 255)
+            else -> {
+                buffer.bigTextCentered(7, minutes.coerceAtMost(99).toString(), 255)
+                buffer.smallTextCentered(15, "MIN", 110)
+            }
+        }
     }
 }
 
-/** Alarm icon + time within the configured window before the next alarm. */
+/**
+ * Chosen design: clock icon + alarm time, with a small progress bar that
+ * fills across the wait window.
+ */
 class AlarmScene : Scene {
     override val id = SceneIds.ALARM
 
@@ -77,19 +96,30 @@ class AlarmScene : Scene {
     ) {
         val alarm = snapshot.nextAlarm ?: return
         val local = alarm.atZone(ZoneId.systemDefault()).toLocalTime()
-        buffer.sprite((buffer.size - 7) / 2, 3, MatrixIcons.ALARM, 255)
-        buffer.smallTextCentered(13, TIME_FORMAT.format(local), 255)
-        val minutes = Duration.between(snapshot.now, alarm).toMinutes()
-        buffer.smallTextCentered(20, "IN ${minutes.coerceAtLeast(0)}", 100)
+        buffer.sprite((buffer.size - 7) / 2, 2, MatrixIcons.ALARM, 255)
+        buffer.smallTextCentered(11, TIME_FORMAT.format(local), 255)
+
+        val window = settings.alarmWindowMinutes.toLong().coerceAtLeast(1)
+        val until = Duration.between(snapshot.now, alarm).toMinutes().coerceAtLeast(0)
+        val progress = 1f - until.toFloat() / window
+        buffer.progressBar(6, 18, 13, 3, progress, 220)
     }
 }
 
-/** Equalizer + track title while media is playing. */
+/**
+ * Chosen design: equalizer bars (animated while playing) over an
+ * always-flowing track title. The Glyph Button toggles play/pause.
+ */
 class MediaScene : Scene {
     override val id = SceneIds.MEDIA
 
-    override fun isActive(snapshot: ContextSnapshot, settings: GlyphSettings): Boolean =
-        snapshot.media?.playing == true
+    override fun isActive(snapshot: ContextSnapshot, settings: GlyphSettings): Boolean {
+        val media = snapshot.media ?: return false
+        if (media.playing) return true
+        // Keep the paused scene around briefly so play can be resumed
+        val lastPlaying = media.lastPlayingAt ?: return false
+        return Duration.between(lastPlaying, snapshot.now) <= PAUSED_LINGER
+    }
 
     override fun render(
         buffer: MatrixBuffer,
@@ -97,24 +127,54 @@ class MediaScene : Scene {
         settings: GlyphSettings,
         tick: Long,
     ) {
-        // 5 equalizer bars, heights vary deterministically with the tick
-        val baseline = 12
-        for (bar in 0 until 5) {
-            val x = 2 + bar * 5
-            val h = 3 + ((tick * 7 + bar * 13) % 8).toInt()
-            for (w in 0 until 3) {
-                buffer.vLine(x + w, baseline - h, baseline, 200)
+        val playing = snapshot.media?.playing == true
+
+        // 7 symmetric bars, 2px wide; animated by tick while playing
+        val baseline = 11
+        for (bar in 0 until 7) {
+            val x = 2 + bar * 3
+            val h = if (playing) {
+                2 + ((tick * 5 + bar * 11 + (bar * bar)) % 8).toInt()
+            } else {
+                2
+            }
+            for (w in 0 until 2) {
+                buffer.vLine(x + w, baseline - h, baseline, if (playing) 220 else 90)
             }
         }
-        Marquee.draw(buffer, 16, snapshot.mediaTitleRaster, tick)
+        if (!playing) {
+            // Play triangle hint centered over the flat bars
+            buffer.sprite(11, 3, PLAY_ICON, 200)
+        }
+
+        Marquee.draw(buffer, 15, snapshot.mediaTitleRaster, tick, force = true)
+    }
+
+    private companion object {
+        val PAUSED_LINGER: Duration = Duration.ofMinutes(5)
+        val PLAY_ICON = listOf("100", "110", "111", "110", "100")
     }
 }
 
-/** Fallback: time, date, today's events + monitored notification counts. */
+/**
+ * Chosen design: minimal — the time is the hero. Date above, dot clusters
+ * below (bright dots = events left today, dim dots = monitored
+ * notifications). The Glyph Button cycles detail views: events → alerts.
+ */
 class AmbientScene : Scene {
     override val id = SceneIds.AMBIENT
 
+    /** 0 = time, 1 = events detail, 2 = notifications detail. */
+    var subView = 0
+    var subViewUntil: java.time.Instant = java.time.Instant.MIN
+
     override fun isActive(snapshot: ContextSnapshot, settings: GlyphSettings): Boolean = true
+
+    fun cycle(now: java.time.Instant, settings: GlyphSettings) {
+        val views = if (settings.monitoredApps.isEmpty()) 2 else 3
+        subView = (subView + 1) % views
+        subViewUntil = now.plus(SUBVIEW_TIMEOUT)
+    }
 
     override fun render(
         buffer: MatrixBuffer,
@@ -122,31 +182,86 @@ class AmbientScene : Scene {
         settings: GlyphSettings,
         tick: Long,
     ) {
-        val zoned = snapshot.now.atZone(ZoneId.systemDefault())
-
-        val weekday = zoned.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).uppercase()
-        buffer.smallTextCentered(1, "$weekday ${zoned.dayOfMonth}", 140)
-
-        buffer.bigTextCentered(8, TIME_FORMAT.format(zoned), 255)
-
-        // Status row: events remaining today; monitored app notifications;
-        // battery indicator. Counts capped at one digit so the row fits.
-        var x = 0
-        buffer.sprite(x, 18, MatrixIcons.CALENDAR, 180)
-        x += 6
-        x += buffer.smallText(x, 18, count(snapshot.remainingEventsToday), 255) + 2
-        if (settings.monitoredApps.isNotEmpty()) {
-            buffer.sprite(x, 18, MatrixIcons.BELL, 180)
-            x += 6
-            x += buffer.smallText(x, 18, count(snapshot.monitoredNotificationCount), 255) + 2
-        }
-        if (snapshot.battery.charging) {
-            buffer.sprite(22, 18, MatrixIcons.LIGHTNING, 200)
-        } else if (snapshot.battery.percent <= settings.lowBatteryThreshold) {
-            val brightness = if (tick % 2 == 0L) 200 else 90
-            buffer.smallText(23, 18, "!", brightness)
+        if (subView != 0 && snapshot.now.isAfter(subViewUntil)) subView = 0
+        when (subView) {
+            1 -> renderEvents(buffer, snapshot)
+            2 -> renderNotifications(buffer, snapshot)
+            else -> renderTime(buffer, snapshot, settings)
         }
     }
 
-    private fun count(n: Int): String = n.coerceAtMost(9).toString()
+    private fun renderTime(
+        buffer: MatrixBuffer,
+        snapshot: ContextSnapshot,
+        settings: GlyphSettings,
+    ) {
+        val zoned = snapshot.now.atZone(ZoneId.systemDefault())
+
+        // Charging / low-battery indicator at top center (inside the circle)
+        if (snapshot.battery.charging) {
+            buffer.sprite(11, 0, MatrixIcons.LIGHTNING, 140)
+        } else if (snapshot.battery.percent <= settings.lowBatteryThreshold) {
+            buffer.smallText(12, 0, "!", 180)
+        }
+
+        // Weekday + day, tight 1px gap so it fits the circle at this row
+        val weekday = zoned.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).uppercase()
+        val date = "$weekday ${zoned.dayOfMonth}"
+        var x = (buffer.size - tightWidth(date)) / 2
+        for (c in date) {
+            if (c == ' ') { x += 2; continue }
+            x += buffer.smallText(x, 6, c.toString(), 110) + 1
+        }
+
+        buffer.bigTextCentered(12, TIME_FORMAT.format(zoned), 255)
+
+        // Dot clusters: events (bright) then notifications (dim)
+        val events = snapshot.remainingEventsToday.coerceAtMost(5)
+        val notifs = if (settings.monitoredApps.isEmpty()) {
+            0
+        } else {
+            snapshot.monitoredNotificationCount.coerceAtMost(5)
+        }
+        val width = clusterWidth(events) +
+            (if (events > 0 && notifs > 0) 3 else 0) + clusterWidth(notifs)
+        var dx = (buffer.size - width) / 2
+        dx = drawCluster(buffer, dx, 20, events, 255)
+        if (events > 0 && notifs > 0) dx += 3
+        drawCluster(buffer, dx, 20, notifs, 100)
+    }
+
+    private fun renderEvents(buffer: MatrixBuffer, snapshot: ContextSnapshot) {
+        buffer.sprite(10, 3, MatrixIcons.CALENDAR, 160)
+        buffer.bigTextCentered(10, snapshot.remainingEventsToday.coerceAtMost(9).toString(), 255)
+        val next = snapshot.nextEvent
+        if (next != null && !next.allDay) {
+            val time = TIME_FORMAT.format(next.begin.atZone(ZoneId.systemDefault()))
+            buffer.smallTextCentered(18, time, 120)
+        }
+    }
+
+    private fun renderNotifications(buffer: MatrixBuffer, snapshot: ContextSnapshot) {
+        buffer.sprite(10, 3, MatrixIcons.BELL, 160)
+        buffer.bigTextCentered(10, snapshot.monitoredNotificationCount.coerceAtMost(9).toString(), 255)
+    }
+
+    private fun tightWidth(text: String): Int =
+        text.sumOf { c ->
+            if (c == ' ') 2 else com.amitozalvo.nothingsuite.glyph.DotFont.smallGlyph(c)[0].length + 1
+        } - 1
+
+    private fun clusterWidth(count: Int): Int = if (count <= 0) 0 else count * 3 - 1
+
+    private fun drawCluster(buffer: MatrixBuffer, x: Int, y: Int, count: Int, brightness: Int): Int {
+        var cx = x
+        repeat(count) {
+            buffer.rect(cx, y, 2, 2, brightness, fill = true)
+            cx += 3
+        }
+        return cx - if (count > 0) 1 else 0
+    }
+
+    private companion object {
+        val SUBVIEW_TIMEOUT: Duration = Duration.ofSeconds(6)
+    }
 }

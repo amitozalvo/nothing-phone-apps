@@ -18,6 +18,9 @@ object StateStore {
     private val _media = MutableStateFlow<MediaInfo?>(null)
     val media: StateFlow<MediaInfo?> = _media
 
+    private val _ringingAlarm = MutableStateFlow<RingingAlarm?>(null)
+    val ringingAlarm: StateFlow<RingingAlarm?> = _ringingAlarm
+
     private val _listenerConnected = MutableStateFlow(false)
     val listenerConnected: StateFlow<Boolean> = _listenerConnected
 
@@ -39,7 +42,21 @@ object StateStore {
     }
 
     fun updateMedia(media: MediaInfo?) {
-        _media.value = media
+        _media.value = media?.copy(
+            lastPlayingAt = if (media.playing) {
+                java.time.Instant.now()
+            } else {
+                media.lastPlayingAt ?: _media.value?.lastPlayingAt
+            },
+        )
+    }
+
+    fun setRingingAlarm(alarm: RingingAlarm?) {
+        _ringingAlarm.value = alarm
+    }
+
+    fun clearRingingAlarmForNotification(key: String) {
+        if (_ringingAlarm.value?.notificationKey == key) _ringingAlarm.value = null
     }
 
     fun setListenerConnected(connected: Boolean) {

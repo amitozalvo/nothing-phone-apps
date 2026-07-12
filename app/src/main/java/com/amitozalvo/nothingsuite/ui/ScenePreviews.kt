@@ -18,6 +18,7 @@ import com.amitozalvo.nothingsuite.calendar.CalendarEvent
 import com.amitozalvo.nothingsuite.config.GlyphSettings
 import com.amitozalvo.nothingsuite.glyph.MatrixBuffer
 import com.amitozalvo.nothingsuite.glyph.TextRaster
+import com.amitozalvo.nothingsuite.glyph.scenes.AlarmRingingToast
 import com.amitozalvo.nothingsuite.glyph.scenes.AlarmScene
 import com.amitozalvo.nothingsuite.glyph.scenes.AmbientScene
 import com.amitozalvo.nothingsuite.glyph.scenes.ChargingToast
@@ -82,10 +83,11 @@ private fun buildPreviews(settings: GlyphSettings): List<Pair<String, IntArray>>
     }
 
     return listOf(
+        "Ambient" to render { AmbientScene().render(it, snapshot, cfg, 0) },
         "Next event" to render { NextEventScene().render(it, snapshot, cfg, 0) },
         "Alarm" to render { AlarmScene().render(it, snapshot, cfg, 0) },
+        "Ringing" to render { AlarmRingingToast("preview").render(it, 0) },
         "Now playing" to render { MediaScene().render(it, snapshot, cfg, 3) },
-        "Ambient" to render { AmbientScene().render(it, snapshot, cfg, 0) },
         "OTP" to render { OtpToast("482913", now.plusSeconds(60), null).render(it, 0) },
         "Charging" to render { ChargingToast(64, now.plusSeconds(8)).render(it, 0) },
         "Low battery" to render { LowBatteryToast(15, now.plusSeconds(8)).render(it, 0) },

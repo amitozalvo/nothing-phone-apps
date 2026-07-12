@@ -15,6 +15,14 @@ data class MediaInfo(
     val title: String,
     val artist: String?,
     val playing: Boolean,
+    /** Last moment playback was observed; keeps the scene up briefly after pause. */
+    val lastPlayingAt: Instant? = null,
+)
+
+/** A currently firing alarm (detected via its full-screen notification). */
+data class RingingAlarm(
+    val notificationKey: String,
+    val label: String?,
 )
 
 data class BatteryInfo(
@@ -35,6 +43,7 @@ data class ContextSnapshot(
     val battery: BatteryInfo = BatteryInfo(100, false),
     /** Total notification count across the user's monitored apps. */
     val monitoredNotificationCount: Int = 0,
+    val ringingAlarm: RingingAlarm? = null,
 ) {
     override fun equals(other: Any?): Boolean = this === other
     override fun hashCode(): Int = System.identityHashCode(this)

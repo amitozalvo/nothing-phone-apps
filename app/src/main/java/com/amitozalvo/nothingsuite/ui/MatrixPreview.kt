@@ -28,6 +28,8 @@ fun MatrixPreview(
         val radius = cell * 0.36f
         for (y in 0 until n) {
             for (x in 0 until n) {
+                // The physical matrix is circular — corners have no LEDs
+                if (!MatrixBuffer.inCircle(x, y)) continue
                 val v = frame.getOrElse(y * n + x) { 0 }
                 val color = if (v == 0) {
                     Color(0xFF161616)

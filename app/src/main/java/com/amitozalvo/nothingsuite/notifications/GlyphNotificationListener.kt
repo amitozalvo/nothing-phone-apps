@@ -13,6 +13,7 @@ import com.amitozalvo.nothingsuite.config.GlyphSettings
 import com.amitozalvo.nothingsuite.config.SettingsRepository
 import com.amitozalvo.nothingsuite.state.MediaInfo
 import com.amitozalvo.nothingsuite.state.OtpMessage
+import com.amitozalvo.nothingsuite.state.RingingAlarm
 import com.amitozalvo.nothingsuite.state.StateStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,7 @@ class GlyphNotificationListener : NotificationListenerService() {
 
     override fun onListenerConnected() {
         Log.d(TAG, "listener connected")
+        instance = this
         StateStore.setListenerConnected(true)
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -62,6 +64,7 @@ class GlyphNotificationListener : NotificationListenerService() {
     }
 
     override fun onListenerDisconnected() {
+        if (instance === this) instance = null
         StateStore.setListenerConnected(false)
         sessionManager?.removeOnActiveSessionsChangedListener(sessionListener)
         sessionManager = null
@@ -72,6 +75,7 @@ class GlyphNotificationListener : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         publishCounts()
         refreshMedia()
+        detectRingingAlarm(sbn)
 
         if (!settings.otpEnabled) return
         if (sbn.packageName !in settings.otpSources) return
@@ -100,6 +104,51 @@ class GlyphNotificationListener : NotificationListenerService() {
         publishCounts()
         refreshMedia()
         StateStore.clearOtpForNotification(sbn.key)
+        StateStore.clearRingingAlarmForNotification(sbn.key)
+    }
+
+    /**
+     * A firing alarm posts a CATEGORY_ALARM notification with a
+     * full-screen intent (upcoming-alarm reminders don't have one).
+     */
+    private fun detectRingingAlarm(sbn: StatusBarNotification) {
+        val n = sbn.notification
+        if (n.category == Notification.CATEGORY_ALARM && n.fullScreenIntent != null) {
+            StateStore.setRingingAlarm(
+                RingingAlarm(
+                    notificationKey = sbn.key,
+                    label = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString(),
+                )
+            )
+        }
+    }
+
+    /** Fire the alarm notification's snooze action (Glyph Button press). */
+    fun snoozeRingingAlarm(): Boolean {
+        val key = StateStore.ringingAlarm.value?.notificationKey ?: return false
+        val sbn = runCatching { activeNotifications }.getOrNull()
+            ?.firstOrNull { it.key == key } ?: return false
+        val actions = sbn.notification.actions?.toList().orEmpty()
+        val snooze = actions.firstOrNull { action ->
+            SNOOZE_WORDS.any { action.title?.toString()?.contains(it, ignoreCase = true) == true }
+        } ?: actions.firstOrNull() ?: return false
+        return runCatching { snooze.actionIntent.send() }
+            .onSuccess { StateStore.setRingingAlarm(null) }
+            .isSuccess
+    }
+
+    /** Toggle the active media session. Returns the new playing state. */
+    fun toggleMediaPlayback(): Boolean? {
+        val msm = sessionManager ?: return null
+        val component = ComponentName(this, GlyphNotificationListener::class.java)
+        val sessions = runCatching { msm.getActiveSessions(component) }.getOrNull() ?: return null
+        val controller = sessions.firstOrNull {
+            it.playbackState?.state == PlaybackState.STATE_PLAYING
+        } ?: sessions.firstOrNull() ?: return null
+        val playing = controller.playbackState?.state == PlaybackState.STATE_PLAYING
+        if (playing) controller.transportControls.pause()
+        else controller.transportControls.play()
+        return !playing
     }
 
     /** Play/pause state changes don't fire the sessions-changed listener. */
@@ -140,7 +189,13 @@ class GlyphNotificationListener : NotificationListenerService() {
         )
     }
 
-    private companion object {
-        const val TAG = "GlyphNotifListener"
+    companion object {
+        private const val TAG = "GlyphNotifListener"
+        private val SNOOZE_WORDS = listOf("snooze", "נודניק", "דחיית", "דחה")
+
+        /** Live listener instance for command calls (same process). */
+        @Volatile
+        var instance: GlyphNotificationListener? = null
+            private set
     }
 }
