@@ -200,12 +200,12 @@ class AmbientScene : Scene {
         val events = snapshot.todayEventItems
         val notifs = snapshot.notificationItems
         when {
-            page == 0 -> renderTime(buffer, snapshot, settings)
+            page == 0 -> renderTime(buffer, snapshot, settings, tick)
             page - 1 < events.size ->
                 renderItem(buffer, MatrixIcons.CALENDAR, events[page - 1], tick)
             page - 1 - events.size < notifs.size ->
                 renderItem(buffer, MatrixIcons.BELL, notifs[page - 1 - events.size], tick)
-            else -> renderTime(buffer, snapshot, settings)
+            else -> renderTime(buffer, snapshot, settings, tick)
         }
     }
 
@@ -213,6 +213,7 @@ class AmbientScene : Scene {
         buffer: MatrixBuffer,
         snapshot: ContextSnapshot,
         settings: GlyphSettings,
+        tick: Long,
     ) {
         val zoned = snapshot.now.atZone(ZoneId.systemDefault())
 
