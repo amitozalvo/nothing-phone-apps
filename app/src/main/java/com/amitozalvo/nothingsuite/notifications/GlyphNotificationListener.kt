@@ -170,8 +170,13 @@ class GlyphNotificationListener : NotificationListenerService() {
                 relevant.sortedByDescending { it.postTime }.mapNotNull { sbn ->
                     val extras = sbn.notification.extras
                     val title = extras.getCharSequence(Notification.EXTRA_TITLE)
-                        ?: extras.getCharSequence(Notification.EXTRA_TEXT)
-                    title?.toString()?.takeIf { it.isNotBlank() }?.let { sbn.packageName to it }
+                        ?.toString()?.takeIf { it.isNotBlank() }
+                    val text = (extras.getCharSequence(Notification.EXTRA_TEXT)
+                        ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
+                        ?.toString()?.takeIf { it.isNotBlank() }
+                    // Sender AND message (e.g. WhatsApp: title=sender, text=body)
+                    val combined = listOfNotNull(title, text).joinToString(": ")
+                    combined.takeIf { it.isNotBlank() }?.let { sbn.packageName to it }
                 }
             )
         }.onFailure { Log.w(TAG, "failed reading notifications", it) }

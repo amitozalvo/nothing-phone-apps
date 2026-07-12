@@ -25,35 +25,45 @@ interface Scene {
 /** Shared helpers for marquee text rendering. */
 object Marquee {
     /**
-     * Draw [rasterized] text at row [y]. Scrolls when wider than the matrix
-     * (or always, with [force]); otherwise centers it. Returns true if the
-     * text is scrolling (needs animation).
+     * Draw [graphic] at row [y]. Scrolls when wider than the matrix (or
+     * always, with [force]); otherwise centers it. RTL text starts at its
+     * beginning (the right end of the raster) and scrolls the other way.
+     * Returns true if the text is scrolling (needs animation).
      */
     fun draw(
         buffer: MatrixBuffer,
         y: Int,
-        rasterized: Array<BooleanArray>?,
+        graphic: com.amitozalvo.nothingsuite.glyph.TitleGraphic?,
         tick: Long,
         brightness: Int = 200,
         force: Boolean = false,
     ): Boolean {
-        if (rasterized == null || rasterized.isEmpty()) return false
-        val width = rasterized.maxOf { it.size }
+        val rows = graphic?.rows ?: return false
+        if (rows.isEmpty()) return false
+        val width = rows.maxOf { it.size }
         return if (width <= buffer.size && !force) {
-            buffer.raster((buffer.size - width) / 2, y, rasterized, 0, brightness)
+            buffer.raster((buffer.size - width) / 2, y, rows, 0, brightness)
             false
         } else {
-            // Hold the start readable for a moment, then loop: text exits
-            // left, re-enters from the right after a small gap
+            // Hold the start readable for a moment, then loop with a gap
             val span = width + GAP
-            val scroll = (((tick - HOLD_TICKS).coerceAtLeast(0) * STEP) % span).toInt()
-            buffer.raster(0, y, rasterized, scroll, brightness)
-            buffer.raster(0, y, rasterized, scroll - span, brightness)
+            val progress = (((tick - HOLD_TICKS).coerceAtLeast(0) * STEP) % span).toInt()
+            val scroll: Int
+            val wrap: Int
+            if (graphic.rtl) {
+                scroll = (width - buffer.size) - progress
+                wrap = scroll + span
+            } else {
+                scroll = progress
+                wrap = scroll - span
+            }
+            buffer.raster(0, y, rows, scroll, brightness)
+            buffer.raster(0, y, rows, wrap, brightness)
             true
         }
     }
 
     private const val GAP = 10
-    private const val STEP = 1
+    private const val STEP = 2
     private const val HOLD_TICKS = 8
 }

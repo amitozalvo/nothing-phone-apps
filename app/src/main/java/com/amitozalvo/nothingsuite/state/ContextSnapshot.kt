@@ -35,7 +35,7 @@ data class TitledItem(
     val title: String,
     /** e.g. an event's start time; null for notifications. */
     val subtitle: String?,
-    val titleRaster: Array<BooleanArray>?,
+    val titleRaster: com.amitozalvo.nothingsuite.glyph.TitleGraphic?,
 ) {
     override fun equals(other: Any?): Boolean = this === other
     override fun hashCode(): Int = System.identityHashCode(this)
@@ -46,11 +46,11 @@ data class ContextSnapshot(
     val now: Instant,
     val nextEvent: CalendarEvent? = null,
     /** Pre-rasterized event title (unicode-safe), for the marquee. */
-    val nextEventTitleRaster: Array<BooleanArray>? = null,
+    val nextEventTitleRaster: com.amitozalvo.nothingsuite.glyph.TitleGraphic? = null,
     val remainingEventsToday: Int = 0,
     val nextAlarm: Instant? = null,
     val media: MediaInfo? = null,
-    val mediaTitleRaster: Array<BooleanArray>? = null,
+    val mediaTitleRaster: com.amitozalvo.nothingsuite.glyph.TitleGraphic? = null,
     val battery: BatteryInfo = BatteryInfo(100, false),
     /** Total notification count across the user's monitored apps. */
     val monitoredNotificationCount: Int = 0,
