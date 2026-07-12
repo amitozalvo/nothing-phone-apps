@@ -14,6 +14,8 @@ data class GlyphSettings(
     val sceneOrder: List<String> = SceneIds.DEFAULT_ORDER,
     val enabledScenes: Set<String> = SceneIds.DEFAULT_ORDER.toSet(),
     val eventLeadMinutes: Int = 30,
+    /** Keep the next-event scene up while the event is running. */
+    val showOngoingEvent: Boolean = false,
     val alarmWindowMinutes: Int = 30,
     val otpEnabled: Boolean = true,
     val otpTimeoutSeconds: Int = 120,

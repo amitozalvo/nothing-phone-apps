@@ -160,12 +160,20 @@ class GlyphNotificationListener : NotificationListenerService() {
 
     private fun publishCounts() {
         runCatching {
-            val counts = activeNotifications
+            val relevant = activeNotifications
                 .filter { it.isClearable || it.notification.flags and Notification.FLAG_ONGOING_EVENT == 0 }
                 .filter { it.notification.flags and Notification.FLAG_GROUP_SUMMARY == 0 }
-                .groupingBy { it.packageName }
-                .eachCount()
-            StateStore.updateNotificationCounts(counts)
+            StateStore.updateNotificationCounts(
+                relevant.groupingBy { it.packageName }.eachCount()
+            )
+            StateStore.updateNotificationTitles(
+                relevant.sortedByDescending { it.postTime }.mapNotNull { sbn ->
+                    val extras = sbn.notification.extras
+                    val title = extras.getCharSequence(Notification.EXTRA_TITLE)
+                        ?: extras.getCharSequence(Notification.EXTRA_TEXT)
+                    title?.toString()?.takeIf { it.isNotBlank() }?.let { sbn.packageName to it }
+                }
+            )
         }.onFailure { Log.w(TAG, "failed reading notifications", it) }
     }
 

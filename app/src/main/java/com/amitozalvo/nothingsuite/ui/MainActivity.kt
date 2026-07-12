@@ -178,6 +178,9 @@ private fun SettingsScreen() {
                         }
                     }
                 },
+                onToggleOngoing = { enabled ->
+                    scope.launch { repo.setShowOngoingEvent(enabled) }
+                },
                 onPickApps = null,
             )
         }
@@ -319,6 +322,7 @@ private fun SceneCard(
     onToggle: (Boolean) -> Unit,
     onMove: (Int) -> Unit,
     onLeadTimeChange: ((Int) -> Unit)?,
+    onToggleOngoing: ((Boolean) -> Unit)? = null,
     onPickApps: (() -> Unit)?,
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = NothingDark)) {
@@ -344,11 +348,25 @@ private fun SceneCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(name, color = NothingWhite, fontSize = 15.sp)
                 when (sceneId) {
-                    SceneIds.NEXT_EVENT -> LeadTimeStepper(
-                        label = "Lead time",
-                        minutes = settings.eventLeadMinutes,
-                        onChange = onLeadTimeChange,
-                    )
+                    SceneIds.NEXT_EVENT -> {
+                        LeadTimeStepper(
+                            label = "Lead time",
+                            minutes = settings.eventLeadMinutes,
+                            onChange = onLeadTimeChange,
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("During event: ", color = NothingGrey, fontSize = 12.sp)
+                            TextButton(
+                                onClick = { onToggleOngoing?.invoke(!settings.showOngoingEvent) },
+                            ) {
+                                Text(
+                                    if (settings.showOngoingEvent) "SHOWN" else "HIDDEN",
+                                    color = if (settings.showOngoingEvent) NothingRed else NothingGrey,
+                                    fontSize = 12.sp,
+                                )
+                            }
+                        }
+                    }
                     SceneIds.ALARM -> LeadTimeStepper(
                         label = "Window",
                         minutes = settings.alarmWindowMinutes,

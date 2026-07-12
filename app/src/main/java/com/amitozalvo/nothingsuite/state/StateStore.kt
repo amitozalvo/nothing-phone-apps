@@ -15,6 +15,10 @@ object StateStore {
     private val _notificationCounts = MutableStateFlow<Map<String, Int>>(emptyMap())
     val notificationCounts: StateFlow<Map<String, Int>> = _notificationCounts
 
+    /** (package, notification title) for current notifications. */
+    private val _notificationTitles = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+    val notificationTitles: StateFlow<List<Pair<String, String>>> = _notificationTitles
+
     private val _media = MutableStateFlow<MediaInfo?>(null)
     val media: StateFlow<MediaInfo?> = _media
 
@@ -39,6 +43,10 @@ object StateStore {
 
     fun updateNotificationCounts(counts: Map<String, Int>) {
         _notificationCounts.value = counts
+    }
+
+    fun updateNotificationTitles(titles: List<Pair<String, String>>) {
+        _notificationTitles.value = titles
     }
 
     fun updateMedia(media: MediaInfo?) {

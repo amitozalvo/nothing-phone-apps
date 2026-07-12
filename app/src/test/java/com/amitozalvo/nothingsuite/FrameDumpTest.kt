@@ -14,6 +14,7 @@ import com.amitozalvo.nothingsuite.glyph.scenes.OtpToast
 import com.amitozalvo.nothingsuite.state.BatteryInfo
 import com.amitozalvo.nothingsuite.state.ContextSnapshot
 import com.amitozalvo.nothingsuite.state.MediaInfo
+import com.amitozalvo.nothingsuite.state.TitledItem
 import org.junit.Test
 import java.time.Instant
 
@@ -36,7 +37,11 @@ class FrameDumpTest {
             battery = BatteryInfo(12, charging = true),
             monitoredNotificationCount = 2,
         )
-        val cfg = GlyphSettings(monitoredApps = setOf("x"))
+        val cfg = GlyphSettings(monitoredApps = setOf("x"), showOngoingEvent = true)
+        val snapshotWithItems = snapshot.copy(
+            todayEventItems = listOf(TitledItem("Design sync", "12:12", null)),
+            notificationItems = listOf(TitledItem("Message", null, null)),
+        )
 
         fun dump(name: String, block: (MatrixBuffer) -> Unit) {
             val b = MatrixBuffer()
@@ -64,14 +69,14 @@ class FrameDumpTest {
             )
         }
         dump("AMBIENT events view") {
-            ambient.cycle(now, cfg)
-            ambient.render(it, snapshot, cfg, 0)
+            ambient.cycle(snapshotWithItems)
+            ambient.render(it, snapshotWithItems, cfg, 0)
         }
         dump("AMBIENT notifs view") {
-            ambient.cycle(now, cfg)
-            ambient.render(it, snapshot, cfg, 0)
+            ambient.cycle(snapshotWithItems)
+            ambient.render(it, snapshotWithItems, cfg, 0)
         }
-        ambient.cycle(now, cfg) // back to time view
+        ambient.cycle(snapshotWithItems) // back to time view
 
         val nextEvent = NextEventScene()
         dump("NEXT EVENT 25min ring") { nextEvent.render(it, snapshot, cfg, 0) }

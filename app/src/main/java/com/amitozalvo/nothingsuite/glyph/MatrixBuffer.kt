@@ -1,9 +1,7 @@
 package com.amitozalvo.nothingsuite.glyph
 
 import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.roundToInt
-import kotlin.math.sin
+import kotlin.math.atan2
 
 /**
  * A 25×25 brightness buffer for the Glyph Matrix. Values 0–255.
@@ -98,21 +96,30 @@ class MatrixBuffer(val size: Int = SIZE) {
     /**
      * Circular progress ring hugging the (physically round) matrix edge,
      * clockwise from 12 o'clock. [progress] in [0, 1] lights the travelled
-     * arc bright over a dim track.
+     * arc bright over a dim track. Uses midpoint-circle rasterization for
+     * a clean, symmetric circle (angle sampling wobbles).
      */
     fun ring(progress: Float, track: Int, fill: Int) {
-        val steps = 96
-        val c = (size - 1) / 2.0
-        val r = c - 0.5
-        fun plot(i: Int, brightness: Int) {
-            val angle = 2.0 * PI * i / steps
-            val x = (c + r * sin(angle)).roundToInt()
-            val y = (c - r * cos(angle)).roundToInt()
-            set(x, y, brightness)
+        val c = (size - 1) / 2
+        var x = c
+        var y = 0
+        var err = 1 - c
+        val points = mutableSetOf<Pair<Int, Int>>()
+        while (x >= y) {
+            points += listOf(
+                c + x to c + y, c - x to c + y, c + x to c - y, c - x to c - y,
+                c + y to c + x, c - y to c + x, c + y to c - x, c - y to c - x,
+            )
+            y++
+            if (err < 0) err += 2 * y + 1 else { x--; err += 2 * (y - x) + 1 }
         }
-        for (i in 0 until steps) plot(i, track)
-        val lit = (steps * progress.coerceIn(0f, 1f)).roundToInt()
-        for (i in 0 until lit) plot(i, fill)
+        val cutoff = 2.0 * PI * progress.coerceIn(0f, 1f)
+        for ((px, py) in points) {
+            // Clockwise angle from 12 o'clock
+            var angle = atan2((px - c).toDouble(), (c - py).toDouble())
+            if (angle < 0) angle += 2.0 * PI
+            set(px, py, if (angle < cutoff) fill else track)
+        }
     }
 
     /**

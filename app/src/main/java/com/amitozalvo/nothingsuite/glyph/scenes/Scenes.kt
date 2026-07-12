@@ -28,6 +28,7 @@ class NextEventScene : Scene {
     override fun isActive(snapshot: ContextSnapshot, settings: GlyphSettings): Boolean {
         val event = snapshot.nextEvent ?: return false
         if (event.allDay || event.end <= snapshot.now) return false
+        if (event.isOngoingAt(snapshot.now)) return settings.showOngoingEvent
         val untilStart = Duration.between(snapshot.now, event.begin)
         return untilStart <= Duration.ofMinutes(settings.eventLeadMinutes.toLong())
     }
@@ -159,21 +160,23 @@ class MediaScene : Scene {
 /**
  * Chosen design: minimal — the time is the hero. Date above, dot clusters
  * below (bright dots = events left today, dim dots = monitored
- * notifications). The Glyph Button cycles detail views: events → alerts.
+ * notifications). The Glyph Button pages through detail views, one per
+ * event / notification, each showing its scrolling title.
  */
 class AmbientScene : Scene {
     override val id = SceneIds.AMBIENT
 
-    /** 0 = time, 1 = events detail, 2 = notifications detail. */
-    var subView = 0
-    var subViewUntil: java.time.Instant = java.time.Instant.MIN
+    /** 0 = time; then one page per event, then one per notification. */
+    var page = 0
+        private set
+    private var pageUntil: java.time.Instant = java.time.Instant.MIN
 
     override fun isActive(snapshot: ContextSnapshot, settings: GlyphSettings): Boolean = true
 
-    fun cycle(now: java.time.Instant, settings: GlyphSettings) {
-        val views = if (settings.monitoredApps.isEmpty()) 2 else 3
-        subView = (subView + 1) % views
-        subViewUntil = now.plus(SUBVIEW_TIMEOUT)
+    fun cycle(snapshot: ContextSnapshot) {
+        val pages = 1 + snapshot.todayEventItems.size + snapshot.notificationItems.size
+        page = (page + 1) % pages
+        pageUntil = snapshot.now.plus(PAGE_TIMEOUT)
     }
 
     override fun render(
@@ -182,10 +185,15 @@ class AmbientScene : Scene {
         settings: GlyphSettings,
         tick: Long,
     ) {
-        if (subView != 0 && snapshot.now.isAfter(subViewUntil)) subView = 0
-        when (subView) {
-            1 -> renderEvents(buffer, snapshot)
-            2 -> renderNotifications(buffer, snapshot)
+        if (page != 0 && snapshot.now.isAfter(pageUntil)) page = 0
+        val events = snapshot.todayEventItems
+        val notifs = snapshot.notificationItems
+        when {
+            page == 0 -> renderTime(buffer, snapshot, settings)
+            page - 1 < events.size ->
+                renderItem(buffer, MatrixIcons.CALENDAR, events[page - 1], tick)
+            page - 1 - events.size < notifs.size ->
+                renderItem(buffer, MatrixIcons.BELL, notifs[page - 1 - events.size], tick)
             else -> renderTime(buffer, snapshot, settings)
         }
     }
@@ -197,10 +205,10 @@ class AmbientScene : Scene {
     ) {
         val zoned = snapshot.now.atZone(ZoneId.systemDefault())
 
-        // Charging / low-battery indicator at top center (inside the circle)
-        if (snapshot.battery.charging) {
-            buffer.sprite(11, 0, MatrixIcons.LIGHTNING, 140)
-        } else if (snapshot.battery.percent <= settings.lowBatteryThreshold) {
+        // Low-battery hint at top center (inside the circle)
+        if (!snapshot.battery.charging &&
+            snapshot.battery.percent <= settings.lowBatteryThreshold
+        ) {
             buffer.smallText(12, 0, "!", 180)
         }
 
@@ -230,19 +238,15 @@ class AmbientScene : Scene {
         drawCluster(buffer, dx, 20, notifs, 100)
     }
 
-    private fun renderEvents(buffer: MatrixBuffer, snapshot: ContextSnapshot) {
-        buffer.sprite(10, 3, MatrixIcons.CALENDAR, 160)
-        buffer.bigTextCentered(10, snapshot.remainingEventsToday.coerceAtMost(9).toString(), 255)
-        val next = snapshot.nextEvent
-        if (next != null && !next.allDay) {
-            val time = TIME_FORMAT.format(next.begin.atZone(ZoneId.systemDefault()))
-            buffer.smallTextCentered(18, time, 120)
-        }
-    }
-
-    private fun renderNotifications(buffer: MatrixBuffer, snapshot: ContextSnapshot) {
-        buffer.sprite(10, 3, MatrixIcons.BELL, 160)
-        buffer.bigTextCentered(10, snapshot.monitoredNotificationCount.coerceAtMost(9).toString(), 255)
+    private fun renderItem(
+        buffer: MatrixBuffer,
+        icon: List<String>,
+        item: com.amitozalvo.nothingsuite.state.TitledItem,
+        tick: Long,
+    ) {
+        buffer.sprite(10, 1, icon, 160)
+        Marquee.draw(buffer, 9, item.titleRaster, tick, force = true)
+        item.subtitle?.let { buffer.smallTextCentered(18, it, 120) }
     }
 
     private fun tightWidth(text: String): Int =
@@ -262,6 +266,6 @@ class AmbientScene : Scene {
     }
 
     private companion object {
-        val SUBVIEW_TIMEOUT: Duration = Duration.ofSeconds(6)
+        val PAGE_TIMEOUT: Duration = Duration.ofSeconds(8)
     }
 }

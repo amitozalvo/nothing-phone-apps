@@ -108,10 +108,17 @@ class SceneEngineTest {
     }
 
     @Test
-    fun ongoingEventStaysActive() {
+    fun ongoingEventShownOnlyWhenEnabled() {
         val engine = SceneEngine.createDefault()
         val snapshot = ContextSnapshot(now = now, nextEvent = event(minutesAway = -10))
-        assertEquals(SceneIds.NEXT_EVENT, engine.selectScene(snapshot, GlyphSettings()).id)
+        assertEquals(
+            SceneIds.AMBIENT,
+            engine.selectScene(snapshot, GlyphSettings(showOngoingEvent = false)).id,
+        )
+        assertEquals(
+            SceneIds.NEXT_EVENT,
+            engine.selectScene(snapshot, GlyphSettings(showOngoingEvent = true)).id,
+        )
     }
 
     @Test

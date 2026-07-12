@@ -34,6 +34,7 @@ import com.amitozalvo.nothingsuite.notifications.GlyphNotificationListener
 import com.amitozalvo.nothingsuite.state.BatteryInfo
 import com.amitozalvo.nothingsuite.state.ContextSnapshot
 import com.amitozalvo.nothingsuite.state.StateStore
+import com.amitozalvo.nothingsuite.state.TitledItem
 import com.nothing.ketchum.Glyph
 import com.nothing.ketchum.GlyphMatrixManager
 import com.nothing.ketchum.GlyphToy
@@ -253,7 +254,7 @@ class ContextAodToyService : Service() {
                 }
             }
             SceneIds.NEXT_EVENT -> nextEventScene.showTitle = true
-            SceneIds.AMBIENT -> ambientScene.cycle(Instant.now(), settings)
+            SceneIds.AMBIENT -> ambientScene.cycle(snapshot.copy(now = Instant.now()))
         }
         renderAndPush(force = true)
     }
@@ -288,6 +289,27 @@ class ContextAodToyService : Service() {
         val counts = StateStore.notificationCounts.value
         val alarmManager = getSystemService(AlarmManager::class.java)
 
+        val zone = java.time.ZoneId.systemDefault()
+        val today = now.atZone(zone).toLocalDate()
+        val timeFormat = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+        val todayEvents = CalendarRepository
+            .upcomingEvents(this, from = now, window = java.time.Duration.ofDays(1))
+            .filter { !it.allDay && it.beginDate(zone) == today && it.end > now }
+            .take(MAX_DETAIL_ITEMS)
+            .map { event ->
+                TitledItem(
+                    title = event.title,
+                    subtitle = timeFormat.format(event.begin.atZone(zone)),
+                    titleRaster = TextRaster.rasterize(event.title),
+                )
+            }
+        val notifications = StateStore.notificationTitles.value
+            .filter { (pkg, _) -> pkg in settings.monitoredApps }
+            .take(MAX_DETAIL_ITEMS)
+            .map { (_, title) ->
+                TitledItem(title = title, subtitle = null, titleRaster = TextRaster.rasterize(title))
+            }
+
         return ContextSnapshot(
             now = now,
             nextEvent = nextEvent,
@@ -302,6 +324,8 @@ class ContextAodToyService : Service() {
             },
             battery = BatteryInfo(batteryPercent(), isCharging()),
             monitoredNotificationCount = settings.monitoredApps.sumOf { counts[it] ?: 0 },
+            todayEventItems = todayEvents,
+            notificationItems = notifications,
             ringingAlarm = StateStore.ringingAlarm.value,
         )
     }
@@ -329,6 +353,7 @@ class ContextAodToyService : Service() {
     private companion object {
         const val TAG = "ContextAodToy"
         const val ANIMATION_INTERVAL_MS = 250L
+        const val MAX_DETAIL_ITEMS = 3
         val TOAST_DURATION: Duration = Duration.ofSeconds(8)
     }
 }
