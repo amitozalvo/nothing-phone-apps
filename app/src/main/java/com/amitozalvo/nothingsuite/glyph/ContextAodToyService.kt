@@ -352,7 +352,7 @@ class ContextAodToyService : Service() {
 
     private companion object {
         const val TAG = "ContextAodToy"
-        const val ANIMATION_INTERVAL_MS = 250L
+        const val ANIMATION_INTERVAL_MS = 100L
         const val MAX_DETAIL_ITEMS = 3
         val TOAST_DURATION: Duration = Duration.ofSeconds(8)
     }

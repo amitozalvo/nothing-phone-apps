@@ -13,7 +13,7 @@ import android.graphics.Typeface
  */
 object TextRaster {
 
-    fun rasterize(text: String, height: Int = 7): Array<BooleanArray> {
+    fun rasterize(text: String, height: Int = 9): Array<BooleanArray> {
         if (text.isBlank()) return emptyArray()
 
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -36,10 +36,12 @@ object TextRaster {
         )
         bitmap.recycle()
 
+        // Low threshold keeps strokes solid after downscaling — thin/broken
+        // glyphs are unreadable on LEDs
         val result = Array(height) { y ->
             BooleanArray(scaled.width) { x ->
                 val pixel = scaled.getPixel(x, y)
-                Color.alpha(pixel) > 96 && luminance(pixel) > 96
+                Color.alpha(pixel) > 60 && luminance(pixel) > 60
             }
         }
         scaled.recycle()

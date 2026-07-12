@@ -83,10 +83,10 @@ class AlarmRingingToast(
     override val dismissableByButton = false
 
     override fun render(buffer: MatrixBuffer, tick: Long) {
-        val bright = if (tick % 2 == 0L) 255 else 130
-        buffer.sprite((buffer.size - 7) / 2, 3, MatrixIcons.ALARM, bright)
+        val pulse = (tick / 4) % 2 == 0L
+        buffer.sprite((buffer.size - 7) / 2, 3, MatrixIcons.ALARM, if (pulse) 255 else 130)
         buffer.smallTextCentered(13, "ZZZ", 140)
-        buffer.hLine(8, 16, 19, if (tick % 2 == 0L) 90 else 40)
+        buffer.hLine(8, 16, 19, if (pulse) 90 else 40)
     }
 }
 

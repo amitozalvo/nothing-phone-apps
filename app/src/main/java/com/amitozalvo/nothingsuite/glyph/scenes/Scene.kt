@@ -43,9 +43,10 @@ object Marquee {
             buffer.raster((buffer.size - width) / 2, y, rasterized, 0, brightness)
             false
         } else {
-            // Loop: text enters from the right, exits left, small gap, repeats
+            // Hold the start readable for a moment, then loop: text exits
+            // left, re-enters from the right after a small gap
             val span = width + GAP
-            val scroll = ((tick * STEP) % span).toInt()
+            val scroll = (((tick - HOLD_TICKS).coerceAtLeast(0) * STEP) % span).toInt()
             buffer.raster(0, y, rasterized, scroll, brightness)
             buffer.raster(0, y, rasterized, scroll - span, brightness)
             true
@@ -54,4 +55,5 @@ object Marquee {
 
     private const val GAP = 10
     private const val STEP = 1
+    private const val HOLD_TICKS = 8
 }

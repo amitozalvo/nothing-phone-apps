@@ -24,6 +24,12 @@ class NextEventScene : Scene {
 
     /** Set by the toy service while the Glyph Button is held down. */
     var showTitle = false
+        set(value) {
+            if (value && !field) captureTickBase = true
+            field = value
+        }
+    private var tickBase = 0L
+    private var captureTickBase = false
 
     override fun isActive(snapshot: ContextSnapshot, settings: GlyphSettings): Boolean {
         val event = snapshot.nextEvent ?: return false
@@ -57,7 +63,8 @@ class NextEventScene : Scene {
         buffer.ring(progress, track = 45, fill = 255)
 
         if (showTitle) {
-            Marquee.draw(buffer, 9, snapshot.nextEventTitleRaster, tick, force = true)
+            if (captureTickBase) { tickBase = tick; captureTickBase = false }
+            Marquee.draw(buffer, 8, snapshot.nextEventTitleRaster, tick - tickBase, force = true)
             return
         }
 
@@ -130,12 +137,13 @@ class MediaScene : Scene {
     ) {
         val playing = snapshot.media?.playing == true
 
-        // 7 symmetric bars, 2px wide; animated by tick while playing
+        // 7 symmetric bars, 2px wide; animated (slower than the 100ms tick)
         val baseline = 11
+        val barTick = tick / 4
         for (bar in 0 until 7) {
             val x = 2 + bar * 3
             val h = if (playing) {
-                2 + ((tick * 5 + bar * 11 + (bar * bar)) % 8).toInt()
+                2 + ((barTick * 5 + bar * 11 + (bar * bar)) % 8).toInt()
             } else {
                 2
             }
@@ -148,7 +156,7 @@ class MediaScene : Scene {
             buffer.sprite(11, 3, PLAY_ICON, 200)
         }
 
-        Marquee.draw(buffer, 15, snapshot.mediaTitleRaster, tick, force = true)
+        Marquee.draw(buffer, 13, snapshot.mediaTitleRaster, tick, force = true)
     }
 
     private companion object {
@@ -170,6 +178,8 @@ class AmbientScene : Scene {
     var page = 0
         private set
     private var pageUntil: java.time.Instant = java.time.Instant.MIN
+    private var tickBase = 0L
+    private var captureTickBase = false
 
     override fun isActive(snapshot: ContextSnapshot, settings: GlyphSettings): Boolean = true
 
@@ -177,6 +187,7 @@ class AmbientScene : Scene {
         val pages = 1 + snapshot.todayEventItems.size + snapshot.notificationItems.size
         page = (page + 1) % pages
         pageUntil = snapshot.now.plus(PAGE_TIMEOUT)
+        captureTickBase = true
     }
 
     override fun render(
@@ -209,7 +220,7 @@ class AmbientScene : Scene {
         if (!snapshot.battery.charging &&
             snapshot.battery.percent <= settings.lowBatteryThreshold
         ) {
-            buffer.smallText(12, 0, "!", 180)
+            buffer.smallText(12, 0, "!", if ((tick / 5) % 2 == 0L) 180 else 80)
         }
 
         // Weekday + day, tight 1px gap so it fits the circle at this row
@@ -244,8 +255,9 @@ class AmbientScene : Scene {
         item: com.amitozalvo.nothingsuite.state.TitledItem,
         tick: Long,
     ) {
-        buffer.sprite(10, 1, icon, 160)
-        Marquee.draw(buffer, 9, item.titleRaster, tick, force = true)
+        if (captureTickBase) { tickBase = tick; captureTickBase = false }
+        buffer.sprite(10, 0, icon, 160)
+        Marquee.draw(buffer, 7, item.titleRaster, tick - tickBase, brightness = 255, force = true)
         item.subtitle?.let { buffer.smallTextCentered(18, it, 120) }
     }
 
