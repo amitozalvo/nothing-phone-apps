@@ -81,58 +81,80 @@ monochrome white/grey, red accent, NDot-style numerals, dot texture.
 ## Deliverable 2 — Context-aware always-on Glyph Toy
 
 A single Glyph Toy service, **AOD-enabled, designed to run as the
-always-on display**. It renders one "scene" at a time on the 25×25 matrix,
-chosen by context priority. A **configuration screen** in the app lets the
-user enable/disable each scene and tune its parameters.
+always-on display**. Content is organized into two surfaces:
 
-### Scenes (priority order, first enabled+active match wins)
+- **Scenes** — persistent full-matrix displays. Each scene has a
+  *predefined activation condition* (when it considers itself "active")
+  and the user controls **sort order** (drag-to-reorder) plus per-scene
+  enable/disable and settings. At any moment the toy shows the first
+  scene in the user's order whose activation condition holds; the ambient
+  board is always active and acts as the fallback.
+- **Toasts & overlays** — short-lived event-driven interrupts (toasts)
+  that temporarily take over the matrix and then revert, and tiny
+  persistent **corner indicators** composited onto the ambient board
+  (layers: the SDK's frame builder supports 3 compositing layers).
+  Battery information deliberately lives here, NOT as a scene, so it
+  never outranks calendar/OTP content.
 
-1. **OTP from messages** *(configurable: on/off, source apps)*
-   - When a notification matching an OTP pattern (4–8 digit code from
-     SMS/messaging apps) arrives, immediately push the code to the matrix
-     (digits paged/scrolled if needed).
-   - **Dismissed by pressing the Glyph Button**; auto-expires after a
-     configurable timeout (default 2 min) or when the notification is
-     dismissed on the phone.
-2. **Next event** *(configurable: lead time, default 30 min)*
-   - Activates the configured time before the next calendar event: shows a
-     **progress bar** (time elapsed toward event start), minutes-until in
-     dot digits, and the **event title as a scrolling marquee**.
-   - While an event is ongoing: progress bar of time remaining.
-3. **Ambient status board** *(default scene when nothing urgent)*
+### Scenes (default order; user-sortable)
+
+1. **Next event** *(activation: within configured lead time, default
+   30 min, of the next calendar event, or event ongoing)*
+   - **Progress bar** of time elapsed toward event start, minutes-until
+     in dot digits, and the **event title as a scrolling marquee**.
+   - While ongoing: progress bar of time remaining.
+2. **Upcoming alarm** *(activation: within configured window, default
+   30 min, of the next alarm — `AlarmManager.getNextAlarmClock()`)*
+   - Alarm icon + alarm time.
+3. **Now playing** *(activation: active media session)*
+   - Small equalizer animation + track title marquee (MediaSession via
+     NotificationListener).
+4. **Ambient status board** *(always active — fallback scene)*
    - Date + time in dot-matrix digits, plus a compact icon row:
      - calendar icon + count of remaining events today
      - notification icon + count of notifications from **user-configured
        apps** (chosen in the config screen from installed apps)
-4. **Additional scenes of the same kind** *(proposed — each individually
-   toggleable, default off unless noted)*
-   - **Charging glance** *(default on)*: while plugged in, battery % with
-     fill animation; goes quiet once full.
-   - **Low battery warning** *(default on)*: <15% and not charging —
-     battery outline + %.
-   - **Missed call badge**: phone icon + count while a missed-call
-     notification is present (same NotificationListener data).
-   - **Upcoming alarm**: alarm icon + alarm time during the 30 min before
-     the next alarm (`AlarmManager.getNextAlarmClock()`).
-   - **Now playing**: while media plays, a small equalizer animation +
-     track title marquee (MediaSession via NotificationListener).
-   - **Timer countdown**: mirrors an active countdown timer notification
-     (e.g. Google Clock) as digits counting down.
+
+### Toasts (transient takeovers; each toggleable)
+
+1. **OTP from messages** *(configurable: source apps, timeout default
+   2 min — the only toast that persists until dismissed/expired)*
+   - When a notification matching an OTP pattern (4–8 digit code from
+     SMS/messaging apps) arrives, immediately push the code to the
+     matrix (digits paged/scrolled if needed).
+   - **Dismissed by pressing the Glyph Button**; auto-expires on timeout
+     or when the notification is dismissed on the phone.
+   - Highest priority — interrupts any scene or toast.
+2. **Charging toast** (~8 s): on plug-in, battery % with fill animation,
+   then revert to the active scene.
+3. **Low-battery toast** (~8 s): fires once when crossing thresholds
+   (default 15% and 5%, not charging) — battery outline + %.
+
+### Corner indicators (on ambient board only)
+
+- **Charging**: small lightning glyph beside the time while plugged in.
+- **Low battery**: dim pulsing battery outline while below threshold.
+
+Explicitly out of scope: missed-call badge (NothingOS essential
+notifications already covers it) and timer countdown (belongs as its own
+dedicated toy, not a scene here).
 
 ### Interactions
 
-- **Glyph Button press (touch down/up)**: dismisses the current transient
-  scene (OTP, missed call…); on the ambient board, a press peeks at the
-  next-event scene.
+- **Glyph Button press (touch down/up)**: dismisses the current toast
+  (OTP, battery); when no toast is showing, a press on the ambient board
+  peeks at the next scene in the user's order.
 - **Long press (`EVENT_CHANGE`)**: cycles through enabled scenes manually.
 
 ### Configuration screen (in-app)
 
-- Master list of scenes with enable/disable toggles and per-scene settings
-  (lead time, OTP timeout, low-battery threshold, monitored apps list).
+- **Sortable scene list** (drag-to-reorder) with enable/disable toggles
+  and per-scene settings (event lead time, alarm window, monitored apps).
+- Toast settings: OTP sources + timeout, charging/low-battery toasts
+  on/off, thresholds.
 - Permission onboarding: calendar permission, notification access grant,
   battery-optimization exemption for reliable event-driven updates.
-- Live 25×25 **matrix preview** of each scene with sample data.
+- Live 25×25 **matrix preview** of each scene/toast with sample data.
 
 ### Constraints honored
 
@@ -157,10 +179,7 @@ Single Kotlin app, single APK (`com.amitozalvo.nothingsuite` — TBD):
 1. OTP source: NotificationListener-based extraction assumed (no `READ_SMS`
    permission). If codes are missed (e.g. RCS quirks), fall back to an SMS
    receiver — confirm acceptable.
-2. Proposed extra scenes (charging, low battery, missed call, alarm,
-   now playing, timer): confirm which to include in v1; all are cheap once
-   the scene engine exists.
-3. Widget default size 4×2 wide — confirm.
+2. Widget default size 4×2 wide — confirm.
 
 ## Testing
 
