@@ -244,6 +244,15 @@ private fun SettingsScreen() {
             onToggle = { scope.launch { repo.setLowBatteryToastEnabled(it) } },
         )
 
+        // ---- Behavior ----
+        SectionTitle("BEHAVIOR")
+        ToggleCard(
+            title = "Only when screen is off or locked",
+            description = "Blank the matrix while you're actively using the phone",
+            checked = settings.onlyWhenScreenOff,
+            onToggle = { scope.launch { repo.setOnlyWhenScreenOff(it) } },
+        )
+
         // ---- Preview ----
         SectionTitle("MATRIX PREVIEW")
         ScenePreviews(settings)

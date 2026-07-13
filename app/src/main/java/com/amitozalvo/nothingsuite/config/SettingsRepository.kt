@@ -20,6 +20,7 @@ class SettingsRepository(private val context: Context) {
         val ENABLED_SCENES = stringSetPreferencesKey("enabled_scenes")
         val EVENT_LEAD_MINUTES = intPreferencesKey("event_lead_minutes")
         val SHOW_ONGOING_EVENT = booleanPreferencesKey("show_ongoing_event")
+        val ONLY_WHEN_SCREEN_OFF = booleanPreferencesKey("only_when_screen_off")
         val ALARM_WINDOW_MINUTES = intPreferencesKey("alarm_window_minutes")
         val OTP_ENABLED = booleanPreferencesKey("otp_enabled")
         val OTP_TIMEOUT_SECONDS = intPreferencesKey("otp_timeout_seconds")
@@ -40,6 +41,7 @@ class SettingsRepository(private val context: Context) {
             enabledScenes = p[Keys.ENABLED_SCENES] ?: defaults.enabledScenes,
             eventLeadMinutes = p[Keys.EVENT_LEAD_MINUTES] ?: defaults.eventLeadMinutes,
             showOngoingEvent = p[Keys.SHOW_ONGOING_EVENT] ?: defaults.showOngoingEvent,
+            onlyWhenScreenOff = p[Keys.ONLY_WHEN_SCREEN_OFF] ?: defaults.onlyWhenScreenOff,
             alarmWindowMinutes = p[Keys.ALARM_WINDOW_MINUTES] ?: defaults.alarmWindowMinutes,
             otpEnabled = p[Keys.OTP_ENABLED] ?: defaults.otpEnabled,
             otpTimeoutSeconds = p[Keys.OTP_TIMEOUT_SECONDS] ?: defaults.otpTimeoutSeconds,
@@ -70,6 +72,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setShowOngoingEvent(enabled: Boolean) {
         context.dataStore.edit { it[Keys.SHOW_ONGOING_EVENT] = enabled }
+    }
+
+    suspend fun setOnlyWhenScreenOff(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.ONLY_WHEN_SCREEN_OFF] = enabled }
     }
 
     suspend fun setAlarmWindowMinutes(minutes: Int) {

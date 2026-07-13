@@ -70,12 +70,20 @@ class ContextAodToyService : Service() {
     private var refreshJob: Job? = null
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var idleTicks = 0
 
     private val animator = object : Runnable {
         override fun run() {
             tick++
             renderAndPush()
-            mainHandler.postDelayed(this, ANIMATION_INTERVAL_MS)
+            // Throttle while the frame is static — full rate only when
+            // something is actually animating (marquee, equalizer, pulse)
+            val interval = if (idleTicks > IDLE_THRESHOLD) {
+                IDLE_INTERVAL_MS
+            } else {
+                ANIMATION_INTERVAL_MS
+            }
+            mainHandler.postDelayed(this, interval)
         }
     }
 
@@ -142,6 +150,23 @@ class ContextAodToyService : Service() {
         override fun onChange(selfChange: Boolean) = refreshSnapshot()
     }
 
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            // SCREEN_ON/OFF and unlock all change display gating
+            renderAndPush(force = true)
+        }
+    }
+
+    /** With the screen-off setting, blank the matrix while phone is in use. */
+    private fun displayAllowed(): Boolean {
+        if (!settings.onlyWhenScreenOff) return true
+        val interactive = getSystemService(android.os.PowerManager::class.java)
+            ?.isInteractive ?: true
+        val locked = getSystemService(android.app.KeyguardManager::class.java)
+            ?.isKeyguardLocked ?: false
+        return !interactive || locked
+    }
+
     override fun onBind(intent: Intent?): IBinder? {
         Log.d(TAG, "onBind")
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -158,6 +183,11 @@ class ContextAodToyService : Service() {
             addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(Intent.ACTION_POWER_DISCONNECTED)
             addAction(Intent.ACTION_BATTERY_CHANGED)
+        })
+        registerReceiver(screenReceiver, IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_USER_PRESENT)
         })
         if (CalendarRepository.hasPermission(this)) {
             contentResolver.registerContentObserver(
@@ -212,6 +242,7 @@ class ContextAodToyService : Service() {
     override fun onUnbind(intent: Intent?): Boolean {
         Log.d(TAG, "onUnbind")
         mainHandler.removeCallbacks(animator)
+        runCatching { unregisterReceiver(screenReceiver) }
         runCatching { unregisterReceiver(batteryReceiver) }
         runCatching { contentResolver.unregisterContentObserver(calendarObserver) }
         scope?.cancel()
@@ -334,8 +365,16 @@ class ContextAodToyService : Service() {
         val gmm = manager ?: return
         // Keep "now" fresh between snapshot rebuilds so clocks don't lag
         val current = snapshot.copy(now = Instant.now())
-        val frame = engine.renderFrame(current, settings, tick)
-        if (!force && lastFrame?.contentEquals(frame) == true) return
+        val frame = if (displayAllowed()) {
+            engine.renderFrame(current, settings, tick)
+        } else {
+            BLANK_FRAME
+        }
+        if (!force && lastFrame?.contentEquals(frame) == true) {
+            idleTicks++
+            return
+        }
+        idleTicks = 0
         lastFrame = frame
         runCatching { gmm.setMatrixFrame(frame) }
             .onFailure { Log.w(TAG, "setMatrixFrame failed", it) }
@@ -353,7 +392,11 @@ class ContextAodToyService : Service() {
     private companion object {
         const val TAG = "ContextAodToy"
         const val ANIMATION_INTERVAL_MS = 100L
+        // After ~2s of identical frames, drop to 2Hz until something changes
+        const val IDLE_THRESHOLD = 20
+        const val IDLE_INTERVAL_MS = 500L
         const val MAX_DETAIL_ITEMS = 3
         val TOAST_DURATION: Duration = Duration.ofSeconds(8)
+        val BLANK_FRAME = IntArray(MatrixBuffer.SIZE * MatrixBuffer.SIZE)
     }
 }
