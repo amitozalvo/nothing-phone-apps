@@ -119,7 +119,7 @@ private fun SettingsScreen() {
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("NOTHING SUITE", color = NothingWhite, fontSize = 22.sp, letterSpacing = 3.sp)
+        Text("GLIMPSE", color = NothingWhite, fontSize = 22.sp, letterSpacing = 3.sp)
         Text(
             "Calendar widget · Context AOD glyph toy",
             color = NothingGrey, fontSize = 13.sp,

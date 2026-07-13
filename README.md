@@ -1,4 +1,4 @@
-# Nothing Suite — Phone (3)
+# Glimpse — Phone (3)
 
 Two things in one sideloadable app:
 
@@ -44,11 +44,11 @@ connected.
 
 ## Setup on the phone
 
-1. Open **Nothing Suite** and grant **Calendar access** and
+1. Open **Glimpse** and grant **Calendar access** and
    **Notification access** (one grant powers OTP detection, notification
    counts and media info — no SMS permission needed).
 2. Add the **Calendar** widget to your home screen (wide sizes look best).
-3. **Settings → Glyph Interface → Glyph Toys** — enable **Context AOD**,
+3. **Settings → Glyph Interface → Glyph Toys** — enable **Glimpse**,
    and select it as the always-on Glyph Toy.
 4. In the app: reorder scenes, set lead times, pick OTP source apps and
    monitored apps. The **Matrix preview** section shows each scene exactly

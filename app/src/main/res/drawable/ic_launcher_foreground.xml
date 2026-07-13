@@ -3,10 +3,10 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group android:translateX="30" android:translateY="30">
-        <path android:fillColor="#FFF2F2F2"
-            android:pathData="M6,6m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0 M18,6m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0 M30,6m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0 M42,6m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0 M6,18m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0 M42,18m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0 M6,30m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0 M42,30m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0 M6,42m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0 M18,42m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0 M30,42m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0 M42,42m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0" />
-        <path android:fillColor="#FFD71921"
-            android:pathData="M18,18m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0 M30,30m-3,0a3,3 0 1,1 6,0a3,3 0 1,1 -6,0" />
-    </group>
+    <!-- Glimpse: the circular Glyph Matrix as a ring of dots, red at 12
+         o'clock. All content inside the adaptive-icon safe zone (66dp). -->
+    <path android:fillColor="#FFF2F2F2"
+        android:pathData="M67,31.48m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M76.52,41m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M80,54m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M76.52,67m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M67,76.52m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M54,80m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M41,76.52m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M31.48,67m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M28,54m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M31.48,41m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M41,31.48m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M54,54m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0" />
+    <path android:fillColor="#FFD71921"
+        android:pathData="M54,28m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0" />
 </vector>
