@@ -1,5 +1,11 @@
 # Glimpse — Phone (3)
 
+**[⬇ Download the latest APK](https://github.com/amitozalvo/nothing-phone-apps/releases/latest)** — every push to `main` builds and publishes a release automatically.
+
+> Sideload note: Play Protect may warn because the app requests notification
+> access (needed for OTP/media features). Expand the dialog and choose
+> "Install anyway", or install via `adb install`.
+
 Two things in one sideloadable app:
 
 1. **Calendar widget** — wide, resizable home screen widget in the Nothing
