@@ -29,6 +29,7 @@ class SettingsRepository(private val context: Context) {
         val LOW_BATTERY_TOAST = booleanPreferencesKey("low_battery_toast_enabled")
         val LOW_BATTERY_THRESHOLD = intPreferencesKey("low_battery_threshold")
         val MONITORED_APPS = stringSetPreferencesKey("monitored_apps")
+        val SELECTED_CALENDARS = stringSetPreferencesKey("selected_calendars")
     }
 
     private val defaults = GlyphSettings()
@@ -50,6 +51,9 @@ class SettingsRepository(private val context: Context) {
             lowBatteryToastEnabled = p[Keys.LOW_BATTERY_TOAST] ?: defaults.lowBatteryToastEnabled,
             lowBatteryThreshold = p[Keys.LOW_BATTERY_THRESHOLD] ?: defaults.lowBatteryThreshold,
             monitoredApps = p[Keys.MONITORED_APPS] ?: defaults.monitoredApps,
+            selectedCalendarIds = p[Keys.SELECTED_CALENDARS]
+                ?.mapNotNull { it.toLongOrNull() }?.toSet()
+                ?: defaults.selectedCalendarIds,
         )
     }
 
@@ -108,6 +112,12 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setMonitoredApps(packages: Set<String>) {
         context.dataStore.edit { it[Keys.MONITORED_APPS] = packages }
+    }
+
+    suspend fun setSelectedCalendars(ids: Set<Long>) {
+        context.dataStore.edit { p ->
+            p[Keys.SELECTED_CALENDARS] = ids.map { it.toString() }.toSet()
+        }
     }
 
     companion object {

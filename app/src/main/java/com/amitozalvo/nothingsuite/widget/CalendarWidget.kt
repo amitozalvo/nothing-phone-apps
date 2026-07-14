@@ -56,9 +56,16 @@ private val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
 class CalendarWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val calendarIds =
+            com.amitozalvo.nothingsuite.config.SettingsRepository.get(context)
+                .current().selectedCalendarIds
         provideContent {
             val hasPermission = CalendarRepository.hasPermission(context)
-            val events = if (hasPermission) CalendarRepository.upcomingEvents(context) else emptyList()
+            val events = if (hasPermission) {
+                CalendarRepository.upcomingEvents(context, calendarIds = calendarIds)
+            } else {
+                emptyList()
+            }
             WidgetContent(context, hasPermission, events)
         }
     }
@@ -207,19 +214,41 @@ private fun EventRow(event: CalendarEvent, zone: ZoneId) {
             .clickable(actionStartActivity(viewEventIntent(event))),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = GlanceModifier
-                .width(3.dp)
-                .height(30.dp)
-                .cornerRadius(2.dp)
-                .background(Color(event.color or 0xFF000000.toInt())),
-        ) {}
+        val barColor = Color(event.color or 0xFF000000.toInt())
+        if (event.pending) {
+            // Dotted accent bar: invitation not accepted yet
+            Column {
+                repeat(3) { i ->
+                    if (i > 0) Spacer(modifier = GlanceModifier.height(4.dp))
+                    Box(
+                        modifier = GlanceModifier
+                            .width(3.dp)
+                            .height(6.dp)
+                            .cornerRadius(2.dp)
+                            .background(barColor),
+                    ) {}
+                }
+            }
+        } else {
+            Box(
+                modifier = GlanceModifier
+                    .width(3.dp)
+                    .height(30.dp)
+                    .cornerRadius(2.dp)
+                    .background(barColor),
+            ) {}
+        }
         Spacer(modifier = GlanceModifier.width(8.dp))
         Column(modifier = GlanceModifier.defaultWeight()) {
             Text(
                 text = event.title,
                 maxLines = 1,
-                style = TextStyle(color = ColorProvider(WHITE), fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                style = TextStyle(
+                    // Pending invitations render dimmer until accepted
+                    color = ColorProvider(if (event.pending) GREY else WHITE),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
             )
             val ongoing = event.isOngoingAt(java.time.Instant.now())
             val subtitle = if (event.allDay) {

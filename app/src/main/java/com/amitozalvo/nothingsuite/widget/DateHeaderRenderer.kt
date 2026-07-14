@@ -18,6 +18,7 @@ object DateHeaderRenderer {
 
     private const val WHITE = 0xFFF2F2F2.toInt()
     private const val RED = 0xFFD71921.toInt()
+    private const val GREY = 0xFF8A8A8A.toInt()
 
     fun render(context: Context, date: LocalDate = LocalDate.now()): Bitmap {
         val density = context.resources.displayMetrics.density
@@ -29,11 +30,14 @@ object DateHeaderRenderer {
             .filter { DotFont.hasSmallGlyph(it) }
             .ifEmpty { date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).uppercase() }
         val day = date.dayOfMonth.toString()
+        val month = date.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+            .uppercase(Locale.getDefault())
+            .filter { DotFont.hasSmallGlyph(it) }
+            .ifEmpty { date.month.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).uppercase() }
 
-        val weekdayWidth = DotFont.smallTextWidth(weekday)
-        val dayWidth = DotFont.smallTextWidth(day)
         val gapDots = 2
-        val totalDots = weekdayWidth + gapDots + dayWidth
+        val totalDots = DotFont.smallTextWidth(weekday) + gapDots +
+            DotFont.smallTextWidth(day) + gapDots + DotFont.smallTextWidth(month)
 
         val width = (totalDots * cell).toInt().coerceAtLeast(1)
         val height = (DotFont.SMALL_HEIGHT * cell).toInt().coerceAtLeast(1)
@@ -44,7 +48,9 @@ object DateHeaderRenderer {
         paint.color = WHITE
         var x = drawDotText(canvas, paint, weekday, 0, cell, radius)
         paint.color = RED
-        drawDotText(canvas, paint, day, x + gapDots, cell, radius)
+        x = drawDotText(canvas, paint, day, x + gapDots, cell, radius)
+        paint.color = GREY
+        drawDotText(canvas, paint, month, x + gapDots, cell, radius)
 
         return bitmap
     }

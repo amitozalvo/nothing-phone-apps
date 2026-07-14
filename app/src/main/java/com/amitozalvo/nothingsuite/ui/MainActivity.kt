@@ -9,8 +9,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.glance.appwidget.updateAll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -182,6 +185,33 @@ private fun SettingsScreen() {
                     scope.launch { repo.setShowOngoingEvent(enabled) }
                 },
                 onPickApps = null,
+            )
+        }
+
+        // Calendar selection for widget + scenes
+        var showCalendarPicker by remember { mutableStateOf(false) }
+        TextButton(onClick = { showCalendarPicker = true }, enabled = calendarGranted) {
+            val label = if (settings.selectedCalendarIds.isEmpty()) {
+                "Calendars: all"
+            } else {
+                "Calendars: ${settings.selectedCalendarIds.size} selected"
+            }
+            Text(label, color = NothingRed, fontSize = 13.sp)
+        }
+        if (showCalendarPicker) {
+            CalendarPickerDialog(
+                selected = settings.selectedCalendarIds,
+                onDismiss = { showCalendarPicker = false },
+                onConfirm = { ids ->
+                    scope.launch {
+                        repo.setSelectedCalendars(ids)
+                        runCatching {
+                            com.amitozalvo.nothingsuite.widget.CalendarWidget()
+                                .updateAll(context)
+                        }
+                    }
+                    showCalendarPicker = false
+                },
             )
         }
 
@@ -416,6 +446,77 @@ private fun LeadTimeStepper(label: String, minutes: Int, onChange: ((Int) -> Uni
             onClick = { onChange?.invoke((minutes + 15).coerceAtMost(120)) },
             modifier = Modifier.size(32.dp),
         ) { Text("+", color = NothingRed) }
+    }
+}
+
+@Composable
+private fun CalendarPickerDialog(
+    selected: Set<Long>,
+    onDismiss: () -> Unit,
+    onConfirm: (Set<Long>) -> Unit,
+) {
+    val context = LocalContext.current
+    val calendars = remember {
+        com.amitozalvo.nothingsuite.calendar.CalendarRepository.availableCalendars(context)
+    }
+    // Empty selection means "all" — show everything checked
+    var current by remember {
+        mutableStateOf(selected.ifEmpty { calendars.map { it.id }.toSet() })
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(colors = CardDefaults.cardColors(containerColor = NothingDark)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Calendars", color = NothingWhite, fontSize = 16.sp)
+                Text(
+                    "Used by the widget and glyph scenes",
+                    color = NothingGrey, fontSize = 12.sp,
+                )
+                Spacer(modifier = Modifier.size(8.dp))
+                Column(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    calendars.forEach { cal ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(
+                                checked = cal.id in current,
+                                onCheckedChange = { checked ->
+                                    current = if (checked) current + cal.id else current - cal.id
+                                },
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .background(
+                                        Color(cal.color or 0xFF000000.toInt()),
+                                        androidx.compose.foundation.shape.CircleShape,
+                                    ),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(cal.name, color = NothingWhite, fontSize = 14.sp)
+                                if (cal.account.isNotBlank() && cal.account != cal.name) {
+                                    Text(cal.account, color = NothingGrey, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("Cancel", color = NothingGrey) }
+                    TextButton(onClick = {
+                        // Everything checked = store empty ("all", incl. future calendars)
+                        val all = calendars.map { it.id }.toSet()
+                        onConfirm(if (current == all) emptySet() else current)
+                    }) { Text("Done", color = NothingRed) }
+                }
+            }
+        }
     }
 }
 

@@ -28,6 +28,8 @@ data class GlyphSettings(
     val lowBatteryThreshold: Int = 15,
     /** Apps whose notification count shows on the ambient board. */
     val monitoredApps: Set<String> = emptySet(),
+    /** Calendars used by the widget and glyph scenes; empty = all visible. */
+    val selectedCalendarIds: Set<Long> = emptySet(),
 ) {
     /** Enabled scenes in user order, always ending with the ambient fallback. */
     fun activeSceneOrder(): List<String> {

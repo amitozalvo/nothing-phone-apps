@@ -20,6 +20,8 @@ data class CalendarEvent(
     val end: Instant,
     val allDay: Boolean,
     val color: Int,
+    /** Invitation not accepted yet (invited with no reply, or tentative). */
+    val pending: Boolean = false,
 ) {
     fun isOngoingAt(now: Instant): Boolean = !allDay && now >= begin && now < end
 
@@ -32,11 +34,43 @@ data class CalendarEvent(
         }
 }
 
+data class CalendarInfo(
+    val id: Long,
+    val name: String,
+    val account: String,
+    val color: Int,
+)
+
 object CalendarRepository {
 
     fun hasPermission(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) ==
             PackageManager.PERMISSION_GRANTED
+
+    /** All synced calendars, for the calendar picker in settings. */
+    fun availableCalendars(context: Context): List<CalendarInfo> {
+        if (!hasPermission(context)) return emptyList()
+        val projection = arrayOf(
+            CalendarContract.Calendars._ID,
+            CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
+            CalendarContract.Calendars.ACCOUNT_NAME,
+            CalendarContract.Calendars.CALENDAR_COLOR,
+        )
+        val calendars = mutableListOf<CalendarInfo>()
+        context.contentResolver.query(
+            CalendarContract.Calendars.CONTENT_URI, projection, null, null, null,
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                calendars += CalendarInfo(
+                    id = cursor.getLong(0),
+                    name = cursor.getString(1) ?: "(unnamed)",
+                    account = cursor.getString(2) ?: "",
+                    color = cursor.getInt(3),
+                )
+            }
+        }
+        return calendars.sortedWith(compareBy({ it.account }, { it.name.lowercase() }))
+    }
 
     /**
      * Upcoming event instances from all visible calendars, expanded from the
@@ -47,6 +81,8 @@ object CalendarRepository {
         from: Instant = Instant.now(),
         window: Duration = Duration.ofDays(14),
         limit: Int = 60,
+        /** Restrict to these calendar ids; null/empty = all visible. */
+        calendarIds: Set<Long>? = null,
     ): List<CalendarEvent> {
         if (!hasPermission(context)) return emptyList()
 
@@ -59,6 +95,7 @@ object CalendarRepository {
 
         val projection = arrayOf(
             CalendarContract.Instances._ID,
+            CalendarContract.Instances.CALENDAR_ID,
             CalendarContract.Instances.EVENT_ID,
             CalendarContract.Instances.TITLE,
             CalendarContract.Instances.EVENT_LOCATION,
@@ -74,6 +111,8 @@ object CalendarRepository {
 
         val events = mutableListOf<CalendarEvent>()
         context.contentResolver.query(uri, projection, selection, null, null)?.use { cursor ->
+            val idxCalendarId =
+                cursor.getColumnIndexOrThrow(CalendarContract.Instances.CALENDAR_ID)
             val idxId = cursor.getColumnIndexOrThrow(CalendarContract.Instances._ID)
             val idxEventId = cursor.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_ID)
             val idxTitle = cursor.getColumnIndexOrThrow(CalendarContract.Instances.TITLE)
@@ -87,10 +126,15 @@ object CalendarRepository {
             val idxStatus = cursor.getColumnIndexOrThrow(CalendarContract.Instances.STATUS)
 
             while (cursor.moveToNext()) {
-                if (cursor.getInt(idxSelfStatus) ==
-                    CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED
+                if (!calendarIds.isNullOrEmpty() &&
+                    cursor.getLong(idxCalendarId) !in calendarIds
                 ) continue
+                val selfStatus = cursor.getInt(idxSelfStatus)
+                if (selfStatus == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED) continue
                 if (cursor.getInt(idxStatus) == CalendarContract.Events.STATUS_CANCELED) continue
+                val pending =
+                    selfStatus == CalendarContract.Attendees.ATTENDEE_STATUS_INVITED ||
+                        selfStatus == CalendarContract.Attendees.ATTENDEE_STATUS_TENTATIVE
 
                 events += CalendarEvent(
                     instanceId = cursor.getLong(idxId),
@@ -101,6 +145,7 @@ object CalendarRepository {
                     end = Instant.ofEpochMilli(cursor.getLong(idxEnd)),
                     allDay = cursor.getInt(idxAllDay) == 1,
                     color = cursor.getInt(idxColor),
+                    pending = pending,
                 )
             }
         }
@@ -111,15 +156,23 @@ object CalendarRepository {
     }
 
     /** The next timed (non-all-day) event that hasn't ended yet. */
-    fun nextTimedEvent(context: Context, now: Instant = Instant.now()): CalendarEvent? =
-        upcomingEvents(context, from = now, window = Duration.ofDays(2), limit = 60)
+    fun nextTimedEvent(
+        context: Context,
+        now: Instant = Instant.now(),
+        calendarIds: Set<Long>? = null,
+    ): CalendarEvent? =
+        upcomingEvents(context, from = now, window = Duration.ofDays(2), calendarIds = calendarIds)
             .firstOrNull { !it.allDay && it.end > now }
 
     /** Count of timed events that still start (or are ongoing) today. */
-    fun remainingEventsToday(context: Context, now: Instant = Instant.now()): Int {
+    fun remainingEventsToday(
+        context: Context,
+        now: Instant = Instant.now(),
+        calendarIds: Set<Long>? = null,
+    ): Int {
         val zone = ZoneId.systemDefault()
         val today = now.atZone(zone).toLocalDate()
-        return upcomingEvents(context, from = now, window = Duration.ofDays(1), limit = 60)
+        return upcomingEvents(context, from = now, window = Duration.ofDays(1), calendarIds = calendarIds)
             .count { !it.allDay && it.beginDate(zone) == today && it.end > now }
     }
 }
