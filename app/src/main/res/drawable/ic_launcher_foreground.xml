@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Glimpse: the circular Glyph Matrix as a ring of dots, red at 12
+         o'clock. All content inside the adaptive-icon safe zone (66dp). -->
+    <path android:fillColor="#FFF2F2F2"
+        android:pathData="M67,31.48m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M76.52,41m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M80,54m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M76.52,67m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M67,76.52m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M54,80m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M41,76.52m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M31.48,67m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M28,54m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M31.48,41m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M41,31.48m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0 M54,54m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0" />
+    <path android:fillColor="#FFD71921"
+        android:pathData="M54,28m-5,0a5,5 0 1,1 10,0a5,5 0 1,1 -10,0" />
+</vector>
