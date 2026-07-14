@@ -256,14 +256,23 @@ private fun EventRow(event: CalendarEvent, zone: ZoneId) {
             } else {
                 val begin = TIME_FORMAT.format(event.begin.atZone(zone))
                 val end = TIME_FORMAT.format(event.end.atZone(zone))
-                val time = if (ongoing) "NOW · $begin – $end" else "$begin – $end"
-                listOfNotNull(time, event.location).joinToString("  ·  ")
+                listOfNotNull("$begin – $end", event.location).joinToString("  ·  ")
             }
-            Text(
-                text = subtitle,
-                maxLines = 1,
-                style = TextStyle(color = ColorProvider(if (ongoing) RED else GREY), fontSize = 11.sp),
-            )
+            Row {
+                if (ongoing) {
+                    // Only the NOW marker is red; the rest stays grey
+                    Text(
+                        text = "NOW · ",
+                        maxLines = 1,
+                        style = TextStyle(color = ColorProvider(RED), fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                    )
+                }
+                Text(
+                    text = subtitle,
+                    maxLines = 1,
+                    style = TextStyle(color = ColorProvider(GREY), fontSize = 11.sp),
+                )
+            }
         }
     }
 }
