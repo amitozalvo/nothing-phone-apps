@@ -111,9 +111,10 @@ private fun Header(context: Context) {
                 .clickable(actionStartActivity(newEventIntent())),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = "+",
-                style = TextStyle(color = ColorProvider(RED), fontSize = 18.sp, fontWeight = FontWeight.Medium),
+            Image(
+                provider = ImageProvider(com.amitozalvo.nothingsuite.R.drawable.ic_add),
+                contentDescription = "New event",
+                modifier = GlanceModifier.size(16.dp),
             )
         }
     }
@@ -128,7 +129,7 @@ private fun EventList(events: List<CalendarEvent>) {
     LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
         items(rows) { row ->
             when (row) {
-                is WidgetRow.DayHeader -> DaySeparator(row.label)
+                is WidgetRow.DayHeader -> DaySeparator(row.label, row.isToday)
                 is WidgetRow.Event -> EventRow(row.event, zone)
             }
         }
@@ -145,7 +146,7 @@ private fun EventList(events: List<CalendarEvent>) {
 }
 
 private sealed interface WidgetRow {
-    data class DayHeader(val label: String) : WidgetRow
+    data class DayHeader(val label: String, val isToday: Boolean = false) : WidgetRow
     data class Event(val event: CalendarEvent) : WidgetRow
 }
 
@@ -158,10 +159,12 @@ private fun buildRows(
     var lastDate: LocalDate? = null
     for (event in events) {
         val date = event.beginDate(zone)
-        if (date != lastDate && date != today) {
-            rows += WidgetRow.DayHeader(dayLabel(date, today))
-            lastDate = date
-        } else if (date == today) {
+        if (date != lastDate) {
+            if (date == today) {
+                rows += WidgetRow.DayHeader("TODAY", isToday = true)
+            } else {
+                rows += WidgetRow.DayHeader(dayLabel(date, today))
+            }
             lastDate = date
         }
         rows += WidgetRow.Event(event)
@@ -178,7 +181,7 @@ private fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
 }
 
 @Composable
-private fun DaySeparator(label: String) {
+private fun DaySeparator(label: String, isToday: Boolean = false) {
     Column(
         modifier = GlanceModifier.fillMaxWidth()
             .padding(top = 8.dp, bottom = 2.dp)
@@ -186,7 +189,11 @@ private fun DaySeparator(label: String) {
     ) {
         Text(
             text = label,
-            style = TextStyle(color = ColorProvider(GREY), fontSize = 11.sp, fontWeight = FontWeight.Medium),
+            style = TextStyle(
+                color = ColorProvider(if (isToday) RED else GREY),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+            ),
         )
     }
 }
@@ -214,17 +221,19 @@ private fun EventRow(event: CalendarEvent, zone: ZoneId) {
                 maxLines = 1,
                 style = TextStyle(color = ColorProvider(WHITE), fontSize = 13.sp, fontWeight = FontWeight.Medium),
             )
+            val ongoing = event.isOngoingAt(java.time.Instant.now())
             val subtitle = if (event.allDay) {
                 "ALL DAY"
             } else {
                 val begin = TIME_FORMAT.format(event.begin.atZone(zone))
                 val end = TIME_FORMAT.format(event.end.atZone(zone))
-                listOfNotNull("$begin – $end", event.location).joinToString("  ·  ")
+                val time = if (ongoing) "NOW · $begin – $end" else "$begin – $end"
+                listOfNotNull(time, event.location).joinToString("  ·  ")
             }
             Text(
                 text = subtitle,
                 maxLines = 1,
-                style = TextStyle(color = ColorProvider(GREY), fontSize = 11.sp),
+                style = TextStyle(color = ColorProvider(if (ongoing) RED else GREY), fontSize = 11.sp),
             )
         }
     }
