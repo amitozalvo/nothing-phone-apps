@@ -221,10 +221,12 @@ private fun EventRow(event: CalendarEvent, zone: ZoneId, leadMinutes: Int) {
     val ongoing = event.isOngoingAt(now)
     val past = !event.allDay && event.end <= now
     val minutesUntil = java.time.Duration.between(now, event.begin).toMinutes()
+    // "SOON" not minutes: widget refreshes aren't minute-accurate, and a
+    // stale number lies while SOON stays true. The Glyph ring has the
+    // live countdown.
     val marker = when {
         ongoing -> "NOW"
-        !event.allDay && minutesUntil in 0..leadMinutes.toLong() ->
-            if (minutesUntil < 1) "NOW" else "IN $minutesUntil MIN"
+        !event.allDay && minutesUntil in 0..leadMinutes.toLong() -> "SOON"
         else -> null
     }
     Row(
