@@ -48,6 +48,22 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 Or open the project in Android Studio and press Run with your Phone (3)
 connected.
 
+## Calendar sources — Google, Outlook, and others
+
+Glimpse reads the **Android system calendar**, so it works with any app
+that syncs into it:
+
+- **Google Calendar** — synced automatically once the account is on the phone.
+- **Outlook / Microsoft 365** — open the Outlook app → Settings → tap your
+  account → enable **"Sync calendars"**. Outlook calendars then appear in
+  Glimpse's calendar picker, the widget, and the Glyph next-event scene.
+  (Glimpse shows a reminder in settings if Outlook is installed but not
+  syncing.)
+- Anything else that syncs to the system calendar (Samsung, Proton via
+  bridge, DAVx⁵/CalDAV, …) works the same way.
+
+Use **Calendars** in Glimpse settings to choose which ones are shown.
+
 ## Setup on the phone
 
 1. Open **Glimpse** and grant **Calendar access** and

@@ -215,6 +215,42 @@ private fun SettingsScreen() {
             )
         }
 
+        // Outlook syncs into the system calendar only when the user enables
+        // it in the Outlook app — surface a hint when it's clearly missing
+        val outlookInstalled = remember {
+            runCatching {
+                context.packageManager.getPackageInfo("com.microsoft.office.outlook", 0)
+            }.isSuccess
+        }
+        val hasOutlookCalendars = remember(calendarGranted) {
+            calendarGranted &&
+                com.amitozalvo.nothingsuite.calendar.CalendarRepository
+                    .availableCalendars(context)
+                    .any {
+                        it.accountType.contains("outlook", ignoreCase = true) ||
+                            it.account.contains("outlook", ignoreCase = true)
+                    }
+        }
+        if (calendarGranted && outlookInstalled && !hasOutlookCalendars) {
+            Card(colors = CardDefaults.cardColors(containerColor = NothingDark)) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("Outlook detected", color = NothingWhite, fontSize = 15.sp)
+                    Text(
+                        "Outlook calendars aren't synced to this phone yet. In the " +
+                            "Outlook app: Settings → your account → enable " +
+                            "“Sync calendars”. They'll then show up here, in the " +
+                            "widget and on the Glyph.",
+                        color = NothingGrey, fontSize = 12.sp,
+                    )
+                    TextButton(onClick = {
+                        context.packageManager
+                            .getLaunchIntentForPackage("com.microsoft.office.outlook")
+                            ?.let { context.startActivity(it) }
+                    }) { Text("Open Outlook", color = NothingRed, fontSize = 13.sp) }
+                }
+            }
+        }
+
         // Monitored apps for the ambient board
         var showAppPicker by remember { mutableStateOf(false) }
         TextButton(onClick = { showAppPicker = true }) {
