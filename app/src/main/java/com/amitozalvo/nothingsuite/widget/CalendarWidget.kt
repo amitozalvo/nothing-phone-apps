@@ -56,17 +56,26 @@ private val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
 class CalendarWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val calendarIds =
-            com.amitozalvo.nothingsuite.config.SettingsRepository.get(context)
-                .current().selectedCalendarIds
+        val settings =
+            com.amitozalvo.nothingsuite.config.SettingsRepository.get(context).current()
         provideContent {
             val hasPermission = CalendarRepository.hasPermission(context)
+            val now = Instant.now()
             val events = if (hasPermission) {
-                CalendarRepository.upcomingEvents(context, calendarIds = calendarIds)
+                // With past events shown, the list covers today from midnight
+                val from = if (settings.showPastEventsToday) {
+                    LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+                } else {
+                    now
+                }
+                CalendarRepository.upcomingEvents(
+                    context, from = from,
+                    calendarIds = settings.selectedCalendarIds,
+                ).filter { settings.showPastEventsToday || it.end > now }
             } else {
                 emptyList()
             }
-            WidgetContent(context, hasPermission, events)
+            WidgetContent(context, hasPermission, events, settings.eventLeadMinutes)
         }
     }
 }
@@ -76,6 +85,7 @@ private fun WidgetContent(
     context: Context,
     hasPermission: Boolean,
     events: List<CalendarEvent>,
+    leadMinutes: Int,
 ) {
     Box(
         modifier = GlanceModifier
@@ -91,7 +101,7 @@ private fun WidgetContent(
             when {
                 !hasPermission -> PermissionHint()
                 events.isEmpty() -> EmptyState()
-                else -> EventList(events)
+                else -> EventList(events, leadMinutes)
             }
         }
     }
@@ -128,7 +138,7 @@ private fun Header(context: Context) {
 }
 
 @Composable
-private fun EventList(events: List<CalendarEvent>) {
+private fun EventList(events: List<CalendarEvent>, leadMinutes: Int) {
     val zone = ZoneId.systemDefault()
     val today = LocalDate.now(zone)
     val rows = buildRows(events, today, zone)
@@ -137,7 +147,7 @@ private fun EventList(events: List<CalendarEvent>) {
         items(rows) { row ->
             when (row) {
                 is WidgetRow.DayHeader -> DaySeparator(row.label, row.isToday)
-                is WidgetRow.Event -> EventRow(row.event, zone)
+                is WidgetRow.Event -> EventRow(row.event, zone, leadMinutes)
             }
         }
         // Trailing filler so taps below the last event open the calendar
@@ -206,7 +216,17 @@ private fun DaySeparator(label: String, isToday: Boolean = false) {
 }
 
 @Composable
-private fun EventRow(event: CalendarEvent, zone: ZoneId) {
+private fun EventRow(event: CalendarEvent, zone: ZoneId, leadMinutes: Int) {
+    val now = Instant.now()
+    val ongoing = event.isOngoingAt(now)
+    val past = !event.allDay && event.end <= now
+    val minutesUntil = java.time.Duration.between(now, event.begin).toMinutes()
+    val marker = when {
+        ongoing -> "NOW"
+        !event.allDay && minutesUntil in 0..leadMinutes.toLong() ->
+            if (minutesUntil < 1) "NOW" else "IN $minutesUntil MIN"
+        else -> null
+    }
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()
@@ -240,17 +260,31 @@ private fun EventRow(event: CalendarEvent, zone: ZoneId) {
         }
         Spacer(modifier = GlanceModifier.width(8.dp))
         Column(modifier = GlanceModifier.defaultWeight()) {
-            Text(
-                text = event.title,
-                maxLines = 1,
-                style = TextStyle(
-                    // Pending invitations render dimmer until accepted
-                    color = ColorProvider(if (event.pending) GREY else WHITE),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                ),
-            )
-            val ongoing = event.isOngoingAt(java.time.Instant.now())
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = event.title,
+                    maxLines = 1,
+                    // Pending invitations and finished events render dimmer
+                    style = TextStyle(
+                        color = ColorProvider(if (event.pending || past) GREY else WHITE),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                    ),
+                    modifier = GlanceModifier.defaultWeight(),
+                )
+                if (marker != null) {
+                    Spacer(modifier = GlanceModifier.width(6.dp))
+                    Text(
+                        text = marker,
+                        maxLines = 1,
+                        style = TextStyle(
+                            color = ColorProvider(RED),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                        ),
+                    )
+                }
+            }
             val subtitle = if (event.allDay) {
                 "ALL DAY"
             } else {
@@ -258,21 +292,14 @@ private fun EventRow(event: CalendarEvent, zone: ZoneId) {
                 val end = TIME_FORMAT.format(event.end.atZone(zone))
                 listOfNotNull("$begin – $end", event.location).joinToString("  ·  ")
             }
-            Row {
-                if (ongoing) {
-                    // Only the NOW marker is red; the rest stays grey
-                    Text(
-                        text = "NOW · ",
-                        maxLines = 1,
-                        style = TextStyle(color = ColorProvider(RED), fontSize = 11.sp, fontWeight = FontWeight.Medium),
-                    )
-                }
-                Text(
-                    text = subtitle,
-                    maxLines = 1,
-                    style = TextStyle(color = ColorProvider(GREY), fontSize = 11.sp),
-                )
-            }
+            Text(
+                text = subtitle,
+                maxLines = 1,
+                style = TextStyle(
+                    color = ColorProvider(if (past) Color(0xFF555555) else GREY),
+                    fontSize = 11.sp,
+                ),
+            )
         }
     }
 }

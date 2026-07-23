@@ -153,8 +153,9 @@ object CalendarRepository {
             }
         }
 
+        // Chronological: ongoing events began earliest so they sort first
         return events
-            .sortedWith(compareBy({ !it.isOngoingAt(from) }, { it.begin.toEpochMilli() }))
+            .sortedBy { it.begin.toEpochMilli() }
             .take(limit)
     }
 

@@ -30,6 +30,8 @@ data class GlyphSettings(
     val monitoredApps: Set<String> = emptySet(),
     /** Calendars used by the widget and glyph scenes; empty = all visible. */
     val selectedCalendarIds: Set<Long> = emptySet(),
+    /** Keep today's already-ended events in the widget (dimmed). */
+    val showPastEventsToday: Boolean = true,
 ) {
     /** Enabled scenes in user order, always ending with the ambient fallback. */
     fun activeSceneOrder(): List<String> {
