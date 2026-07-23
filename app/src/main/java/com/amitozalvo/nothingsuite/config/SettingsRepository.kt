@@ -30,6 +30,7 @@ class SettingsRepository(private val context: Context) {
         val LOW_BATTERY_THRESHOLD = intPreferencesKey("low_battery_threshold")
         val MONITORED_APPS = stringSetPreferencesKey("monitored_apps")
         val SELECTED_CALENDARS = stringSetPreferencesKey("selected_calendars")
+        val SHOW_PAST_EVENTS_TODAY = booleanPreferencesKey("show_past_events_today")
     }
 
     private val defaults = GlyphSettings()
@@ -54,6 +55,8 @@ class SettingsRepository(private val context: Context) {
             selectedCalendarIds = p[Keys.SELECTED_CALENDARS]
                 ?.mapNotNull { it.toLongOrNull() }?.toSet()
                 ?: defaults.selectedCalendarIds,
+            showPastEventsToday = p[Keys.SHOW_PAST_EVENTS_TODAY]
+                ?: defaults.showPastEventsToday,
         )
     }
 
@@ -112,6 +115,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setMonitoredApps(packages: Set<String>) {
         context.dataStore.edit { it[Keys.MONITORED_APPS] = packages }
+    }
+
+    suspend fun setShowPastEventsToday(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.SHOW_PAST_EVENTS_TODAY] = enabled }
     }
 
     suspend fun setSelectedCalendars(ids: Set<Long>) {

@@ -310,6 +310,22 @@ private fun SettingsScreen() {
             onToggle = { scope.launch { repo.setLowBatteryToastEnabled(it) } },
         )
 
+        // ---- Widget ----
+        SectionTitle("WIDGET")
+        ToggleCard(
+            title = "Show finished events",
+            description = "Keep today's ended events visible, dimmed",
+            checked = settings.showPastEventsToday,
+            onToggle = { enabled ->
+                scope.launch {
+                    repo.setShowPastEventsToday(enabled)
+                    runCatching {
+                        com.amitozalvo.nothingsuite.widget.CalendarWidget().updateAll(context)
+                    }
+                }
+            },
+        )
+
         // ---- Behavior ----
         SectionTitle("BEHAVIOR")
         ToggleCard(
