@@ -11,6 +11,8 @@
 
     <!-- App picker in settings: list launchable apps -->
     <queries>
+        <!-- Detect Outlook for the calendar-sync hint and intent fallbacks -->
+        <package android:name="com.microsoft.office.outlook" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />

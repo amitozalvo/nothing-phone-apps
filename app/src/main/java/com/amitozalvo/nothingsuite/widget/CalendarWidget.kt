@@ -83,7 +83,7 @@ private fun WidgetContent(
             .background(BLACK)
             .cornerRadius(24.dp)
             .padding(12.dp)
-            .clickable(actionStartActivity(openCalendarAppIntent())),
+            .clickable(actionStartActivity(openCalendarAppIntent(androidx.glance.LocalContext.current))),
     ) {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             Header(context)
@@ -107,7 +107,7 @@ private fun Header(context: Context) {
             provider = ImageProvider(DateHeaderRenderer.render(context)),
             contentDescription = LocalDate.now().toString(),
             modifier = GlanceModifier.height(22.dp)
-                .clickable(actionStartActivity(openCalendarAppIntent())),
+                .clickable(actionStartActivity(openCalendarAppIntent(androidx.glance.LocalContext.current))),
         )
         Spacer(modifier = GlanceModifier.defaultWeight())
         Box(
@@ -115,7 +115,7 @@ private fun Header(context: Context) {
                 .size(28.dp)
                 .background(Color(0xFF1A1A1A))
                 .cornerRadius(14.dp)
-                .clickable(actionStartActivity(newEventIntent())),
+                .clickable(actionStartActivity(newEventIntent(androidx.glance.LocalContext.current))),
             contentAlignment = Alignment.Center,
         ) {
             Image(
@@ -146,7 +146,7 @@ private fun EventList(events: List<CalendarEvent>) {
                 modifier = GlanceModifier
                     .fillMaxWidth()
                     .height(80.dp)
-                    .clickable(actionStartActivity(openCalendarAppIntent())),
+                    .clickable(actionStartActivity(openCalendarAppIntent(androidx.glance.LocalContext.current))),
             ) {}
         }
     }
@@ -192,7 +192,7 @@ private fun DaySeparator(label: String, isToday: Boolean = false) {
     Column(
         modifier = GlanceModifier.fillMaxWidth()
             .padding(top = 8.dp, bottom = 2.dp)
-            .clickable(actionStartActivity(openCalendarAppIntent())),
+            .clickable(actionStartActivity(openCalendarAppIntent(androidx.glance.LocalContext.current))),
     ) {
         Text(
             text = label,
@@ -281,7 +281,7 @@ private fun EventRow(event: CalendarEvent, zone: ZoneId) {
 private fun EmptyState() {
     Box(
         modifier = GlanceModifier.fillMaxSize()
-            .clickable(actionStartActivity(openCalendarAppIntent())),
+            .clickable(actionStartActivity(openCalendarAppIntent(androidx.glance.LocalContext.current))),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -305,22 +305,45 @@ private fun PermissionHint() {
     }
 }
 
-private fun openCalendarAppIntent(): Intent =
-    Intent(Intent.ACTION_VIEW).apply {
-        // Canonical "open calendar app at now" URI; ACTION_MAIN with
-        // CATEGORY_APP_CALENDAR does not resolve on real devices
+private const val OUTLOOK_PACKAGE = "com.microsoft.office.outlook"
+
+/**
+ * Open the user's calendar app. Tries the canonical calendar time URI
+ * (Google Calendar / AOSP), then the system calendar-app selector, then
+ * Outlook — so taps work whichever calendar app the user lives in.
+ */
+private fun openCalendarAppIntent(context: Context): Intent {
+    val timeIntent = Intent(Intent.ACTION_VIEW).apply {
         data = CalendarContract.CONTENT_URI.buildUpon()
             .appendPath("time")
             .appendPath(System.currentTimeMillis().toString())
             .build()
         flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
+    val pm = context.packageManager
+    if (pm.resolveActivity(timeIntent, 0) != null) return timeIntent
 
-private fun newEventIntent(): Intent =
-    Intent(Intent.ACTION_INSERT).apply {
+    val selector = Intent.makeMainSelectorActivity(
+        Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR,
+    ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+    if (pm.resolveActivity(selector, 0) != null) return selector
+
+    return pm.getLaunchIntentForPackage(OUTLOOK_PACKAGE)?.apply {
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+    } ?: timeIntent
+}
+
+private fun newEventIntent(context: Context): Intent {
+    val insert = Intent(Intent.ACTION_INSERT).apply {
         data = CalendarContract.Events.CONTENT_URI
         flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
+    return if (context.packageManager.resolveActivity(insert, 0) != null) {
+        insert
+    } else {
+        openCalendarAppIntent(context)
+    }
+}
 
 private fun viewEventIntent(event: CalendarEvent): Intent =
     Intent(Intent.ACTION_VIEW).apply {

@@ -38,6 +38,7 @@ data class CalendarInfo(
     val id: Long,
     val name: String,
     val account: String,
+    val accountType: String,
     val color: Int,
 )
 
@@ -54,6 +55,7 @@ object CalendarRepository {
             CalendarContract.Calendars._ID,
             CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
             CalendarContract.Calendars.ACCOUNT_NAME,
+            CalendarContract.Calendars.ACCOUNT_TYPE,
             CalendarContract.Calendars.CALENDAR_COLOR,
         )
         val calendars = mutableListOf<CalendarInfo>()
@@ -65,7 +67,8 @@ object CalendarRepository {
                     id = cursor.getLong(0),
                     name = cursor.getString(1) ?: "(unnamed)",
                     account = cursor.getString(2) ?: "",
-                    color = cursor.getInt(3),
+                    accountType = cursor.getString(3) ?: "",
+                    color = cursor.getInt(4),
                 )
             }
         }
