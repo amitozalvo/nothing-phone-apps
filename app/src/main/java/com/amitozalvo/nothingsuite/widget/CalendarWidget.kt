@@ -61,17 +61,29 @@ class CalendarWidget : GlanceAppWidget() {
         provideContent {
             val hasPermission = CalendarRepository.hasPermission(context)
             val now = Instant.now()
+            val zone = ZoneId.systemDefault()
+            val today = LocalDate.now(zone)
             val events = if (hasPermission) {
                 // With past events shown, the list covers today from midnight
                 val from = if (settings.showPastEventsToday) {
-                    LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+                    today.atStartOfDay(zone).toInstant()
                 } else {
                     now
                 }
                 CalendarRepository.upcomingEvents(
                     context, from = from,
                     calendarIds = settings.selectedCalendarIds,
-                ).filter { settings.showPastEventsToday || it.end > now }
+                ).filter { event ->
+                    if (event.allDay) {
+                        // All-day instants are UTC; yesterday's all-day event
+                        // "ends" at 00:00 UTC today and would leak through an
+                        // instant comparison. Compare by covered dates: the
+                        // exclusive end date must be after today.
+                        event.end.atZone(ZoneId.of("UTC")).toLocalDate().isAfter(today)
+                    } else {
+                        settings.showPastEventsToday || event.end > now
+                    }
+                }
             } else {
                 emptyList()
             }
