@@ -94,7 +94,12 @@ class FrameDumpTest {
         dump("NEXT EVENT 25min ring") { nextEvent.render(it, snapshot, cfg, 0) }
         dump("NEXT EVENT ongoing") {
             nextEvent.render(
-                it, snapshot.copy(nextEvent = event.copy(begin = now.minusSeconds(600))), cfg, 0,
+                it,
+                snapshot.copy(
+                    nextEvent = null,
+                    ongoingEvent = event.copy(begin = now.minusSeconds(600)),
+                ),
+                cfg, 0,
             )
         }
         dump("ALARM in 18") { AlarmScene().render(it, snapshot, cfg, 0) }

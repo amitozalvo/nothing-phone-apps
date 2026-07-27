@@ -159,14 +159,23 @@ object CalendarRepository {
             .take(limit)
     }
 
-    /** The next timed (non-all-day) event that hasn't ended yet. */
-    fun nextTimedEvent(
+    /** The next timed (non-all-day) event that hasn't started yet. */
+    fun nextUpcomingTimedEvent(
         context: Context,
         now: Instant = Instant.now(),
         calendarIds: Set<Long>? = null,
     ): CalendarEvent? =
         upcomingEvents(context, from = now, window = Duration.ofDays(2), calendarIds = calendarIds)
-            .firstOrNull { !it.allDay && it.end > now }
+            .firstOrNull { !it.allDay && it.begin > now }
+
+    /** A timed event currently in progress, if any (latest-started wins). */
+    fun ongoingTimedEvent(
+        context: Context,
+        now: Instant = Instant.now(),
+        calendarIds: Set<Long>? = null,
+    ): CalendarEvent? =
+        upcomingEvents(context, from = now, window = Duration.ofHours(1), calendarIds = calendarIds)
+            .lastOrNull { !it.allDay && it.isOngoingAt(now) }
 
     /** Count of timed events that still start (or are ongoing) today. */
     fun remainingEventsToday(

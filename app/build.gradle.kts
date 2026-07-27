@@ -12,8 +12,8 @@ android {
         applicationId = "com.amitozalvo.nothingsuite"
         minSdk = 34
         targetSdk = 35
-        versionCode = 15
-        versionName = "0.5.3"
+        versionCode = 16
+        versionName = "0.5.4"
     }
 
     // Sideload signing: create signing/release.keystore (gitignored) with
