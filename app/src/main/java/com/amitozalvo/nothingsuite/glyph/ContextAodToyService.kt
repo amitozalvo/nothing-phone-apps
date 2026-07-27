@@ -316,7 +316,8 @@ class ContextAodToyService : Service() {
     private fun buildSnapshot(): ContextSnapshot {
         val now = Instant.now()
         val calendarIds = settings.selectedCalendarIds
-        val nextEvent = CalendarRepository.nextTimedEvent(this, now, calendarIds)
+        val nextEvent = CalendarRepository.nextUpcomingTimedEvent(this, now, calendarIds)
+        val ongoingEvent = CalendarRepository.ongoingTimedEvent(this, now, calendarIds)
         val media = StateStore.media.value
         val counts = StateStore.notificationCounts.value
         val alarmManager = getSystemService(AlarmManager::class.java)
@@ -350,6 +351,8 @@ class ContextAodToyService : Service() {
             now = now,
             nextEvent = nextEvent,
             nextEventTitleRaster = nextEvent?.let { TitleRaster.of(it.title) },
+            ongoingEvent = ongoingEvent,
+            ongoingEventTitleRaster = ongoingEvent?.let { TitleRaster.of(it.title) },
             remainingEventsToday = CalendarRepository.remainingEventsToday(this, now, calendarIds),
             nextAlarm = alarmManager?.nextAlarmClock?.let {
                 Instant.ofEpochMilli(it.triggerTime)

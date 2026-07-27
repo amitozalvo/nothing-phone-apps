@@ -110,11 +110,33 @@ class SceneEngineTest {
     @Test
     fun ongoingEventShownOnlyWhenEnabled() {
         val engine = SceneEngine.createDefault()
-        val snapshot = ContextSnapshot(now = now, nextEvent = event(minutesAway = -10))
+        val snapshot = ContextSnapshot(now = now, ongoingEvent = event(minutesAway = -10))
         assertEquals(
             SceneIds.AMBIENT,
             engine.selectScene(snapshot, GlyphSettings(showOngoingEvent = false)).id,
         )
+        assertEquals(
+            SceneIds.NEXT_EVENT,
+            engine.selectScene(snapshot, GlyphSettings(showOngoingEvent = true)).id,
+        )
+    }
+
+    @Test
+    fun upcomingEventWinsOverSimultaneousOngoingEvent() {
+        // Regression: an in-progress event must not hide or replace an
+        // upcoming event inside the lead window
+        val engine = SceneEngine.createDefault()
+        val snapshot = ContextSnapshot(
+            now = now,
+            nextEvent = event(minutesAway = 5),
+            ongoingEvent = event(minutesAway = -30, durationMinutes = 120),
+        )
+        // Scene is active even with ongoing display disabled...
+        assertEquals(
+            SceneIds.NEXT_EVENT,
+            engine.selectScene(snapshot, GlyphSettings(showOngoingEvent = false)).id,
+        )
+        // ...and also, obviously, with it enabled
         assertEquals(
             SceneIds.NEXT_EVENT,
             engine.selectScene(snapshot, GlyphSettings(showOngoingEvent = true)).id,

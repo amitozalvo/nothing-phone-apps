@@ -31,13 +31,23 @@ class NextEventScene : Scene {
     private var tickBase = 0L
     private var captureTickBase = false
 
-    override fun isActive(snapshot: ContextSnapshot, settings: GlyphSettings): Boolean {
-        val event = snapshot.nextEvent ?: return false
-        if (event.allDay || event.end <= snapshot.now) return false
-        if (event.isOngoingAt(snapshot.now)) return settings.showOngoingEvent
-        val untilStart = Duration.between(snapshot.now, event.begin)
-        return untilStart <= Duration.ofMinutes(settings.eventLeadMinutes.toLong())
-    }
+    /** Upcoming event inside the lead window — always wins over ongoing. */
+    private fun upcoming(snapshot: ContextSnapshot, settings: GlyphSettings) =
+        snapshot.nextEvent?.takeIf { event ->
+            !event.allDay && event.begin > snapshot.now &&
+                Duration.between(snapshot.now, event.begin) <=
+                Duration.ofMinutes(settings.eventLeadMinutes.toLong())
+        }
+
+    private fun ongoing(snapshot: ContextSnapshot, settings: GlyphSettings) =
+        if (!settings.showOngoingEvent) {
+            null
+        } else {
+            snapshot.ongoingEvent?.takeIf { !it.allDay && it.isOngoingAt(snapshot.now) }
+        }
+
+    override fun isActive(snapshot: ContextSnapshot, settings: GlyphSettings): Boolean =
+        upcoming(snapshot, settings) != null || ongoing(snapshot, settings) != null
 
     override fun render(
         buffer: MatrixBuffer,
@@ -45,12 +55,13 @@ class NextEventScene : Scene {
         settings: GlyphSettings,
         tick: Long,
     ) {
-        val event = snapshot.nextEvent ?: return
-        val ongoing = event.isOngoingAt(snapshot.now)
+        val upcomingEvent = upcoming(snapshot, settings)
+        val event = upcomingEvent ?: ongoing(snapshot, settings) ?: return
+        val isOngoing = upcomingEvent == null
 
         val minutes: Long
         val progress: Float
-        if (ongoing) {
+        if (isOngoing) {
             minutes = Duration.between(snapshot.now, event.end).toMinutes().coerceAtLeast(0)
             val total = Duration.between(event.begin, event.end).toMinutes().coerceAtLeast(1)
             progress = 1f - minutes.toFloat() / total
@@ -64,12 +75,17 @@ class NextEventScene : Scene {
 
         if (showTitle) {
             if (captureTickBase) { tickBase = tick; captureTickBase = false }
-            Marquee.draw(buffer, 8, snapshot.nextEventTitleRaster, tick - tickBase, force = true)
+            val raster = if (isOngoing) {
+                snapshot.ongoingEventTitleRaster
+            } else {
+                snapshot.nextEventTitleRaster
+            }
+            Marquee.draw(buffer, 8, raster, tick - tickBase, force = true)
             return
         }
 
         when {
-            ongoing -> {
+            isOngoing -> {
                 buffer.bigTextCentered(7, minutes.coerceAtMost(99).toString(), 255)
                 buffer.smallTextCentered(15, "LEFT", 110)
             }

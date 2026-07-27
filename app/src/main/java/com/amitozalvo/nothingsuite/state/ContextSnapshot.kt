@@ -44,9 +44,13 @@ data class TitledItem(
 /** Everything the scene engine needs to decide + render one frame. */
 data class ContextSnapshot(
     val now: Instant,
+    /** The next timed event that hasn't started yet. */
     val nextEvent: CalendarEvent? = null,
     /** Pre-rasterized event title (unicode-safe), for the marquee. */
     val nextEventTitleRaster: com.amitozalvo.nothingsuite.glyph.TitleGraphic? = null,
+    /** A timed event currently in progress (independent of nextEvent). */
+    val ongoingEvent: CalendarEvent? = null,
+    val ongoingEventTitleRaster: com.amitozalvo.nothingsuite.glyph.TitleGraphic? = null,
     val remainingEventsToday: Int = 0,
     val nextAlarm: Instant? = null,
     val media: MediaInfo? = null,
